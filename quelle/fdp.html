@@ -696,7 +696,10 @@ function kontrast(){
   if(!tf.length){t.innerHTML='<tr><td class="hin">Noch keine Textfelder.</td></tr>';return;}
   tf.forEach(r=>{
     let unter=bg;
-    els.forEach(o=>{ if((o.t==="rect"||o.t==="circle") && els.indexOf(o)<els.indexOf(r)
+    // Ein Textfeld mit eigenem Farbkasten steht auf diesem Kasten,
+    // nicht auf dem Folienhintergrund.
+    if(r.bgAn&&r.bg) unter=hex2rgb(r.bg);
+    else els.forEach(o=>{ if((o.t==="rect"||o.t==="circle") && els.indexOf(o)<els.indexOf(r)
       && r.y>=o.y-10 && r.y<=o.y+(o.h||0)+10) unter=hex2rgb(o.fill); });
     const v=kontrastwert(hex2rgb(r.color),unter);
     const gross=r.size>=48;

@@ -64,13 +64,13 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "DEIN-KONTO",
+        "owner": "MWF86",
         "repo": "daumenkino"
       }
     ]
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/DEIN-KONTO/daumenkino.git"
+    "url": "https://github.com/MWF86/daumenkino.git"
   }
 }

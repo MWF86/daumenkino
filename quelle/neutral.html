@@ -331,15 +331,12 @@ body.folie .el.sel .gr{display:block}
 
     <h4 style="font-size:13px;margin:14px 0 6px;color:var(--a)">Anbieter</h4>
     <p style="font-size:13px;line-height:1.7;color:#c3cede">
-      [FIRMA] GmbH<br>
+      [NAME ODER FIRMA]<br>
       [STRASSE UND HAUSNUMMER]<br>
       [PLZ UND ORT]<br>
       Deutschland<br><br>
-      Vertreten durch die Geschäftsführung [VORNAME NACHNAME]<br>
-      Handelsregister [AMTSGERICHT], HRB [NUMMER]<br>
-      Umsatzsteuer-Identifikationsnummer [DE………]<br><br>
       E-Mail [ADRESSE]<br>
-      Telefon [NUMMER]
+      Telefon [TELEFON]
     </p>
 
     <h4 style="font-size:13px;margin:16px 0 6px;color:var(--a)">Verbraucherstreitbeilegung</h4>
@@ -358,7 +355,10 @@ body.folie .el.sel .gr{display:block}
     <h4 style="font-size:13px;margin:16px 0 6px;color:var(--a)">Verwendete freie Software</h4>
     <p style="font-size:12.5px;line-height:1.7;color:#c3cede">
       html2canvas 1.4.1, Copyright 2012 Niklas von Hertzen, MIT-Lizenz.
-      Der vollständige Lizenztext steht im Quelltext dieser Datei.
+      Der vollständige Lizenztext steht im Quelltext dieser Datei.<br><br>
+      Schrift Poppins, Copyright 2020 The Poppins Project Authors,
+      SIL Open Font License 1.1. Die Schrift ist in diese Datei eingebettet;
+      der Lizenztext liegt der Weitergabe bei.
     </p>
 
     <h4 style="font-size:13px;margin:16px 0 6px;color:var(--a)">Nutzung</h4>
@@ -742,7 +742,10 @@ function kontrast(){
   if(!tf.length){t.innerHTML='<tr><td class="hin">Noch keine Textfelder.</td></tr>';return;}
   tf.forEach(r=>{
     let unter=bg;
-    els.forEach(o=>{ if((o.t==="rect"||o.t==="circle") && els.indexOf(o)<els.indexOf(r)
+    // Ein Textfeld mit eigenem Farbkasten steht auf diesem Kasten,
+    // nicht auf dem Folienhintergrund.
+    if(r.bgAn&&r.bg) unter=hex2rgb(r.bg);
+    else els.forEach(o=>{ if((o.t==="rect"||o.t==="circle") && els.indexOf(o)<els.indexOf(r)
       && r.y>=o.y-10 && r.y<=o.y+(o.h||0)+10) unter=hex2rgb(o.fill); });
     const v=kontrastwert(hex2rgb(r.color),unter);
     const gross=r.size>=48;

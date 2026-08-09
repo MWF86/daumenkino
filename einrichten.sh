@@ -8,8 +8,8 @@ echo "  Daumenkino auf GitHub einrichten"
 echo "  --------------------------------"
 echo
 
-read -rp "  Dein GitHub-Benutzername: " KONTO
-[ -z "$KONTO" ] && { echo "  Ohne Benutzername geht es nicht."; exit 1; }
+read -rp "  Dein GitHub-Benutzername [MWF86]: " KONTO
+KONTO=${KONTO:-MWF86}
 
 read -rp "  Name des Repositorys [daumenkino]: " REPO
 REPO=${REPO:-daumenkino}

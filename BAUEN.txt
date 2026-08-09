@@ -59,7 +59,7 @@ So richtest du es ein:
 1. Auf GitHub ein Repository anlegen, zum Beispiel moritzfingerle/daumenkino.
 2. In package.json unter "build" den Eintrag "publish": null ersetzen durch
 
-      "publish": [{ "provider": "github", "owner": "DEIN-KONTO", "repo": "daumenkino" }]
+      "publish": [{ "provider": "github", "owner": "MWF86", "repo": "daumenkino" }]
 
 3. Ein Zugriffstoken als Umgebungsvariable GH_TOKEN setzen und bauen mit
 
