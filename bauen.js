@@ -62,5 +62,9 @@ const befehl = ["electron-builder", "--" + ziel,
   "-c.appId=" + f.appId, "-c.productName=" + f.name, "-c.publish.channel=" + f.kanal,
   ...durchreichen.filter(a => a !== welche && a !== ziel)];
 console.log("  " + befehl.join(" "));
-const r = spawnSync("npx", befehl, { stdio: "inherit", cwd: hier, shell: process.platform === "win32" });
+// Auf Windows laeuft npx nur ueber die Shell, und die zerlegt Argumente an
+// Leerzeichen - "Daumenkino FDP" wuerde zu zwei Argumenten. Deshalb quoten.
+const mitShell = process.platform === "win32";
+const aufruf = mitShell ? befehl.map(a => /\s/.test(a) ? '"' + a + '"' : a) : befehl;
+const r = spawnSync("npx", aufruf, { stdio: "inherit", cwd: hier, shell: mitShell });
 process.exit(r.status === null ? 1 : r.status);

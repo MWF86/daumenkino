@@ -65,7 +65,8 @@
       {
         "provider": "github",
         "owner": "MWF86",
-        "repo": "daumenkino"
+        "repo": "daumenkino",
+        "releaseType": "release"
       }
     ]
   },
