@@ -1,0 +1,54 @@
+name: Veröffentlichen
+
+# Ein Tag genügt. Danach baut GitHub beide Fassungen für macOS und Windows
+# und hängt sie an eine Version im Reiter "Releases". Die ausgelieferten
+# Programme holen sich die neue Fassung von dort selbst ab.
+#
+#     npm version patch        (oder minor / major)
+#     git push --follow-tags
+#
+# Wer nur schauen will, ob der Bau durchläuft, startet den Lauf von Hand
+# über "Actions" -> "Veröffentlichen" -> "Run workflow".
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bauen:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - betriebssystem: macos-latest
+            ziel: mac
+          - betriebssystem: windows-latest
+            ziel: win
+    runs-on: ${{ matrix.betriebssystem }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Abhängigkeiten holen
+        run: npm ci
+
+      - name: Neutrale Fassung
+        run: node bauen.js neutral ${{ matrix.ziel }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Ohne Apple-Zertifikat nicht signieren, sonst bricht der Bau ab.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Interne Fassung
+        run: node bauen.js fdp ${{ matrix.ziel }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false

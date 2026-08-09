@@ -1,0 +1,7 @@
+node_modules/
+fertig/
+# von bauen.js erzeugt, gehoert nicht in die Versionsverwaltung
+app/
+icons/
+fassung.json
+.DS_Store

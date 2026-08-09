@@ -1,0 +1,98 @@
+Daumenkino als Programm bauen
+=============================
+
+Es gibt zwei Fassungen aus einer Quelle: fdp und neutral. Sie unterscheiden
+sich in Farbvorgabe, Symbol und Impressum, sonst in nichts.
+
+
+Einmalig vorbereiten
+--------------------
+1. Node.js installieren, von nodejs.org, die LTS-Fassung.
+2. Terminal oeffnen, in diesen Ordner wechseln, dann:
+
+      npm install
+
+
+Ausprobieren, ohne zu bauen
+---------------------------
+      npm start           neutrale Fassung
+      npm run start:fdp   interne Fassung
+
+
+Bauen
+-----
+      npm run bau:mac         macOS, neutral
+      npm run bau:mac:fdp     macOS, intern
+      npm run bau:win         Windows, neutral
+      npm run bau:win:fdp     Windows, intern
+
+Das Ergebnis liegt danach im Ordner fertig.
+
+Ein macOS-Programm laesst sich nur auf einem Mac erzeugen, Apple liefert die
+Werkzeuge nur fuer macOS. Windows laesst sich vom Mac aus bauen.
+
+
+Beim ersten Start auf einem fremden Rechner
+-------------------------------------------
+macOS meldet, dass die App nicht ueberprueft werden konnte, weil sie kein
+Apple-Zertifikat hat. Systemeinstellungen, Datenschutz und Sicherheit, nach
+unten scrollen, bei Daumenkino auf "Trotzdem oeffnen". Einmalig.
+
+Windows meldet ueber SmartScreen, dass der Computer geschuetzt wurde.
+"Weitere Informationen", dann "Trotzdem ausfuehren". Ebenfalls einmalig.
+
+Ohne diese Meldungen geht es nur mit Zertifikaten:
+  macOS    Apple Developer Program, 99 USD im Jahr, plus Notarisierung
+  Windows  OV-Zertifikat, 150 bis 300 USD im Jahr. Bringt wenig, weil
+           SmartScreen auf Ruf statt auf Zertifikat schaut und der Ruf sich
+           erst ueber Downloadzahlen aufbaut.
+
+
+Aktualisierung einrichten
+-------------------------
+Ohne diesen Schritt bleibt jede ausgelieferte Kopie fuer immer auf dem Stand
+des Tages, an dem du sie weitergegeben hast. Ein Fehler, den du spaeter
+behebst, erreicht niemanden mehr, und du wirst zur Auskunftsstelle.
+
+So richtest du es ein:
+
+1. Auf GitHub ein Repository anlegen, zum Beispiel moritzfingerle/daumenkino.
+2. In package.json unter "build" den Eintrag "publish": null ersetzen durch
+
+      "publish": [{ "provider": "github", "owner": "DEIN-KONTO", "repo": "daumenkino" }]
+
+3. Ein Zugriffstoken als Umgebungsvariable GH_TOKEN setzen und bauen mit
+
+      npx electron-builder --mac --publish always
+
+Danach prueft jedes ausgelieferte Programm vier Sekunden nach dem Start, ob
+es eine neuere Fassung gibt, laedt sie im Hintergrund und fragt einmal, ob
+neu gestartet werden soll. Im Menue unter Hilfe laesst sich zusaetzlich von
+Hand pruefen.
+
+Solange "publish": null steht, passiert nichts. Das Programm laeuft, sucht
+aber nicht nach Neuerungen, und der Menuepunkt sagt das auch.
+
+
+Was wo liegt
+------------
+main.js        Fenster, Menue, Speichern-Dialoge, Aktualisierung
+preload.js     die vier Funktionen, die das Fenster benutzen darf
+bauen.js       stellt app/ und icons/ aus quelle/ zusammen und startet den Bau
+quelle/        die eigentlichen Anwendungen und die beiden Symbolsaetze
+app/, icons/   werden von bauen.js erzeugt, nichts von Hand aendern
+fertig/        die gebauten Programme
+
+
+Die Anwendung selbst aendern
+----------------------------
+Nicht in quelle/ arbeiten. Die beiden Dateien dort sind Kopien aus
+
+      ../Quelle/Daumenkino_FDP.html
+      ../Quelle/Daumenkino_Neutral.html
+
+Dort aendern, dann im Ordner SoMe/App einmal
+
+      python3 Quelle/verteilen.py
+
+Das schreibt alle Fassungen neu, auch die beiden hier in quelle/.

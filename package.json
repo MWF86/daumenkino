@@ -1,0 +1,76 @@
+{
+  "name": "daumenkino",
+  "productName": "Daumenkino",
+  "version": "1.1.0",
+  "description": "Karussells für Instagram bauen. Ohne Konto, ohne Cloud.",
+  "main": "main.js",
+  "author": {
+    "name": "Moritz Fingerle"
+  },
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "node bauen.js neutral --nur-vorbereiten && electron .",
+    "start:fdp": "node bauen.js fdp --nur-vorbereiten && electron .",
+    "bau:mac": "node bauen.js neutral mac",
+    "bau:mac:fdp": "node bauen.js fdp mac",
+    "bau:win": "node bauen.js neutral win",
+    "bau:win:fdp": "node bauen.js fdp win",
+    "bau:linux": "node bauen.js neutral linux",
+    "bau:mac:beide": "node bauen.js neutral mac && node bauen.js fdp mac",
+    "bau:win:beide": "node bauen.js neutral win && node bauen.js fdp win"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "build": {
+    "appId": "de.moritzfingerle.daumenkino",
+    "productName": "Daumenkino",
+    "directories": {
+      "output": "fertig"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "fassung.json",
+      "app/**/*",
+      "icons/**/*"
+    ],
+    "mac": {
+      "icon": "icons/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.graphics-design"
+    },
+    "win": {
+      "icon": "icons/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "icon": "icons/icon.png",
+      "target": [
+        "AppImage"
+      ],
+      "category": "Graphics"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "DEIN-KONTO",
+        "repo": "daumenkino"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DEIN-KONTO/daumenkino.git"
+  }
+}
