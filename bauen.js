@@ -58,8 +58,12 @@ if (nurVorbereiten || !ziel) {
 // Getrennte Kanaele, damit sich die beiden Fassungen im selben Repository
 // nicht gegenseitig die Aktualisierungsdatei ueberschreiben.
 const durchreichen = arg.filter(a => a.startsWith("--publish") || a === "always" || a === "never");
+// Notarisieren nur, wenn die Apple-Zugangsdaten da sind (im GitHub-Bau).
+// Lokal ohne Zertifikat baut es weiter unsigniert.
+const notarisieren = process.env.APPLE_ID ? ["-c.mac.notarize=true"] : [];
 const befehl = ["electron-builder", "--" + ziel,
   "-c.appId=" + f.appId, "-c.productName=" + f.name, "-c.publish.channel=" + f.kanal,
+  ...notarisieren,
   ...durchreichen.filter(a => a !== welche && a !== ziel)];
 console.log("  " + befehl.join(" "));
 // Auf Windows laeuft npx nur ueber die Shell, und die zerlegt Argumente an

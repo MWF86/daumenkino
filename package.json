@@ -45,7 +45,11 @@
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.graphics-design"
+      "category": "public.app-category.graphics-design",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist"
     },
     "win": {
       "icon": "icons/icon.ico",
