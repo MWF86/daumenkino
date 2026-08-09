@@ -14,7 +14,9 @@ function bauen() {
     width: 1440, height: 900, minWidth: 380, minHeight: 560,
     backgroundColor: "#0e131a",
     title: FASSUNG.name,
-    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    // Normale Titelleiste: mit der versteckten lagen die Ampel-Knoepfe
+    // ueber dem Schriftzug der Anwendung.
+    titleBarStyle: "default",
     icon: path.join(__dirname, "icons", process.platform === "win32" ? "icon.ico" : "icon.png"),
     webPreferences: {
       contextIsolation: true,
