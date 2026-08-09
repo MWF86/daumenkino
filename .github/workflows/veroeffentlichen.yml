@@ -19,7 +19,24 @@ permissions:
   contents: write
 
 jobs:
+  # Das Release einmal vorab anlegen. Sonst legen der Mac- und der
+  # Windows-Lauf beim gleichzeitigen ersten Hochladen je ein eigenes
+  # Release zum selben Tag an, und die Dateien verteilen sich auf zwei.
+  release_anlegen:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Release anlegen, falls es fehlt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "${TAG#v}" --notes ""
+
   bauen:
+    needs: release_anlegen
+    if: always() && (needs.release_anlegen.result == 'success' || needs.release_anlegen.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
