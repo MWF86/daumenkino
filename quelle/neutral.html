@@ -613,9 +613,23 @@ function bind(d){
     const sx=ev.clientX,sy=ev.clientY,ox=r.x,oy=r.y,ow=r.w,oh=r.h||0;
     const mv=e=>{const dx=(e.clientX-sx)/z,dy=(e.clientY-sy)/z;
       if(grab){r.w=Math.max(30,Math.round(ow+dx));if(r.t!=="text")r.h=Math.max(8,Math.round(oh+dy));}
-      else{r.x=Math.round(ox+dx);r.y=Math.round(oy+dy);}
+      else{
+        // Magnetisches Einrasten: Buehnenmitte und Kanten der anderen Elemente
+        let nx=Math.round(ox+dx),ny=Math.round(oy+dy);
+        const eb=r.el.offsetWidth,eh=r.el.offsetHeight,S=8;
+        let mittigX=false,mittigY=false;
+        const kandX=[[Math.round((W-eb)/2),true]],kandY=[[Math.round((H-eh)/2),true]];
+        els.forEach(o=>{if(o===r)return;
+          kandX.push([o.x,false],[o.x+o.el.offsetWidth-eb,false]);
+          kandY.push([o.y,false],[o.y+o.el.offsetHeight-eh,false]);});
+        kandX.forEach(k=>{if(Math.abs(nx-k[0])<=S){nx=k[0];if(k[1])mittigX=true;}});
+        kandY.forEach(k=>{if(Math.abs(ny-k[0])<=S){ny=k[0];if(k[1])mittigY=true;}});
+        hilfslinie("V").style.display=mittigX?"block":"none";
+        hilfslinie("H").style.display=mittigY?"block":"none";
+        r.x=nx;r.y=ny;
+      }
       paint(r);fill();};
-    const up=()=>{document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up)};
+    const up=()=>{document.removeEventListener("pointermove",mv);document.removeEventListener("pointerup",up);hilfslinienWeg();};
     document.addEventListener("pointermove",mv);document.addEventListener("pointerup",up);
     ev.preventDefault();ev.stopPropagation();});
 }
@@ -793,7 +807,8 @@ async function gitter(){
   const box=g("gitter");box.innerHTML="";
   const cv=await bild();
   const q=document.createElement("canvas");q.width=q.height=W;
-  q.getContext("2d").drawImage(cv,0,Math.round((H-W)/2),W,W,0,0,W,W);
+  const sk=cv.width/W;
+  q.getContext("2d").drawImage(cv,0,Math.round((H-W)/2*sk),W*sk,W*sk,0,0,W,W);
   const url=q.toDataURL("image/png");
   for(let i=0;i<9;i++){const d=document.createElement("div");
     if(i===0)d.style.backgroundImage=`url(${url})`;box.appendChild(d);}
@@ -810,7 +825,7 @@ async function bild(){
   const t=stage.style.transform;stage.style.transform="none";
   const vor=sel;select(null);
   const rr=g("raster").classList.contains("on");g("raster").classList.remove("on");
-  const cv=await html2canvas(stage,{width:W,height:H,scale:1,backgroundColor:null,useCORS:true});
+  const cv=await html2canvas(stage,{width:W,height:H,scale:window.__hochaufloesend?2:1,backgroundColor:null,useCORS:true});
   stage.style.transform=t;stage.style.boxShadow=sch;if(rr)g("raster").classList.add("on");
   if(reiter==="folie")select(vor);
   return cv;
@@ -920,8 +935,151 @@ window.addEventListener("message",async e=>{
   if(e.source&&e.source.postMessage)e.source.postMessage(antwort,e.origin||"*");
 });
 
+/* ---------- Sichern, Widerrufen, Galerie, Teilen ----------
+   Automatisches Sichern im Geraetespeicher (bleibt lokal), Widerrufen mit
+   Schnappschuessen, magnetische Hilfslinien beim Ziehen, eingebaute
+   Vorlagen-Galerie in den Markenfarben, Teilen-Knopf und ein Schalter fuer
+   doppelte Exportaufloesung. */
+const SICHERUNG="daumenkino.autosicherung";
+let __ruhig=false,__puffer=[],__zeiger=-1,__g;
+function stand(){return {v:1,projekt:daten(),serie:g("serie").value,caption:g("caption").value};}
+function anwenden(s){__ruhig=true;
+  try{ladeDaten(s.projekt);g("serie").value=s.serie||"";g("caption").value=s.caption||"";capPruef();}
+  finally{__ruhig=false;}}
+function sichern(){
+  try{localStorage.setItem(SICHERUNG,JSON.stringify(stand()));}
+  catch(e){/* meist zu grosse Bilder: ohne Bilddaten erneut versuchen */
+    try{const s=stand();if(s.projekt.bg)s.projekt.bg.img=null;
+      s.projekt.els.forEach(o=>{if(o.t==="img")o.src=null;});
+      localStorage.setItem(SICHERUNG,JSON.stringify(s));}catch(e2){}}}
+function wiederherstellen(){
+  try{const roh=localStorage.getItem(SICHERUNG);if(!roh)return false;
+    const s=JSON.parse(roh);if(!s||!s.projekt||!(s.projekt.els||[]).length)return false;
+    anwenden(s);return true;}catch(e){return false;}}
+function merke(){
+  const j=JSON.stringify(stand());
+  if(__puffer[__zeiger]===j)return;
+  __puffer=__puffer.slice(0,__zeiger+1);__puffer.push(j);
+  if(__puffer.length>60)__puffer.shift();
+  __zeiger=__puffer.length-1;}
+function widerrufen(){if(__zeiger>0){__zeiger--;anwenden(JSON.parse(__puffer[__zeiger]));sichern();}}
+function wiederholen(){if(__zeiger<__puffer.length-1){__zeiger++;anwenden(JSON.parse(__puffer[__zeiger]));sichern();}}
+function geaendert(){if(__ruhig||window.__start)return;clearTimeout(__g);__g=setTimeout(()=>{sichern();merke();},700);}
+
+/* zentrale Aenderungs-Haken */
+const __paint=paint;paint=function(r){__paint(r);geaendert();};
+const __lagen=lagen;lagen=function(){__lagen();geaendert();};
+const __bgPaint=bgPaint;bgPaint=function(){__bgPaint();geaendert();};
+const __palette=palette;palette=function(){__palette();geaendert();};
+["serie","caption","vname"].forEach(id=>{const e=g(id);if(e)e.addEventListener("input",geaendert);});
+document.addEventListener("keydown",e=>{
+  if(!(e.metaKey||e.ctrlKey)||e.key.toLowerCase()!=="z")return;
+  if(/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;
+  e.preventDefault();e.shiftKey?wiederholen():widerrufen();});
+
+/* Hilfslinien beim Ziehen */
+function hilfslinie(art){let d=g("hl"+art);
+  if(!d){d=document.createElement("div");d.id="hl"+art;
+    d.style.cssText="position:absolute;background:#ff2d92;pointer-events:none;z-index:8;display:none;"+
+      (art==="V"?"width:2px;top:0;bottom:0":"height:2px;left:0;right:0");
+    stage.appendChild(d);}
+  if(art==="V")d.style.left=(W/2-1)+"px";else d.style.top=(H/2-1)+"px";
+  return d;}
+function hilfslinienWeg(){const v=g("hlV"),h=g("hlH");if(v)v.style.display="none";if(h)h.style.display="none";}
+
+/* Teilen ueber den System-Dialog, wo das Geraet es kann */
+async function teilen(){
+  const cv=await bild();
+  cv.toBlob(async b=>{
+    if(!b)return;
+    const datei=new File([b],(g("vname").value||"folie")+".png",{type:"image/png"});
+    if(navigator.canShare&&navigator.canShare({files:[datei]})){
+      try{await navigator.share({files:[datei],title:"Daumenkino"});}catch(e){}
+    }else{const a=document.createElement("a");a.download=datei.name;a.href=URL.createObjectURL(b);a.click();}
+  },"image/png");
+}
+
+/* Vorlagen-Galerie, Farben folgen den Markenfarben */
+function vorlagenGalerie(){
+  const m0=MARKE[0],m1=MARKE[1],m2=MARKE[2],grau=MARKE[MARKE.length-1];
+  const T={size:72,weight:700,align:"left",lh:115,ls:0,upper:"none",strike:"none",fit:true,bgAn:false,bg:m0,pad:30,rad:14,alle:false};
+  const bgF=c=>({art:"farbe",c:c,g1:m1,g2:m2,gw:45,dk:40,img:null});
+  return [
+    {name:"Themen-Karussell",hinweis:"Kicker-Pille, gro\u00dfe \u00dcberschrift, Seitenzahl und Pfeil",
+     daten:{name:"Themen-Karussell",W:1080,H:1350,marke:MARKE.slice(),bg:bgF(m1),els:[
+       Object.assign({},T,{t:"text",name:"Kicker",x:88,y:250,w:400,text:"Thema der Woche",size:24,color:m1,align:"center",ls:10,upper:"uppercase",fit:false,bgAn:true,bg:m0,pad:18,rad:999}),
+       Object.assign({},T,{t:"text",name:"\u00dcberschrift",x:88,y:430,w:904,text:"Hier steht die Kernaussage",size:80,color:"#ffffff"}),
+       Object.assign({},T,{t:"text",name:"Unterzeile",x:88,y:820,w:820,text:"Eine Zeile Einordnung dazu.",size:34,weight:500,color:grau,fit:false}),
+       Object.assign({},T,{t:"text",name:"Pfeil",x:88,y:1150,w:904,text:"\u2193",size:64,color:m0,align:"center",fit:false,alle:true}),
+       Object.assign({},T,{t:"text",name:"Seitenzahl",x:792,y:78,w:200,text:"01",size:26,color:m2,align:"right",ls:8,fit:false,alle:true,auto:"nummer"})]}},
+    {name:"Zitat-Kachel",hinweis:"Zitat auf Markenfarbe, Name und Funktion darunter",
+     daten:{name:"Zitat-Kachel",W:1080,H:1350,marke:MARKE.slice(),bg:bgF(m0),els:[
+       Object.assign({},T,{t:"text",name:"Zitatzeichen",x:88,y:220,w:260,text:"\u201C",size:220,color:m1,fit:false,lh:80,alle:true}),
+       Object.assign({},T,{t:"text",name:"Zitat",x:88,y:480,w:904,text:"Hier steht das Zitat, gern \u00fcber mehrere Zeilen.",size:64,color:m1}),
+       Object.assign({},T,{t:"text",name:"Name",x:88,y:1050,w:904,text:"Vorname Nachname",size:34,color:m1,fit:false}),
+       Object.assign({},T,{t:"text",name:"Funktion",x:88,y:1110,w:904,text:"Funktion, Ort",size:26,weight:500,color:m1,fit:false})]}},
+    {name:"Termin-Ank\u00fcndigung",hinweis:"Titel, Datum im Kasten, Ortszeile",
+     daten:{name:"Termin-Ank\u00fcndigung",W:1080,H:1350,marke:MARKE.slice(),bg:bgF(m1),els:[
+       {t:"rect",name:"Balken",x:88,y:200,w:180,h:16,fill:m0,radius:0},
+       Object.assign({},T,{t:"text",name:"Art",x:88,y:260,w:600,text:"Einladung",size:26,color:m2,ls:10,upper:"uppercase",fit:false}),
+       Object.assign({},T,{t:"text",name:"Titel",x:88,y:380,w:904,text:"Titel der Veranstaltung",size:76,color:"#ffffff"}),
+       Object.assign({},T,{t:"text",name:"Datum und Uhrzeit",x:88,y:850,w:904,text:"Mi \u00b7 24. September \u00b7 19 Uhr",size:40,color:m1,bgAn:true,bg:m0,pad:28,rad:12,fit:false}),
+       Object.assign({},T,{t:"text",name:"Ort",x:88,y:1010,w:904,text:"Ort oder Link",size:32,weight:500,color:grau,fit:false})]}}];
+}
+function galerieZeigen(){
+  let d=g("galerie");
+  if(d){d.style.display="flex";return;}
+  d=document.createElement("div");d.id="galerie";
+  d.style.cssText="position:fixed;inset:0;background:rgba(5,10,18,.72);display:flex;align-items:center;justify-content:center;z-index:60;padding:18px";
+  const k=document.createElement("div");
+  k.style.cssText="background:#141a24;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:22px;max-width:430px;width:100%;max-height:85vh;overflow:auto";
+  k.innerHTML='<b style="font-size:17px">Vorlagen-Galerie</b><p style="font-size:13.5px;color:#8a94a6;margin:6px 0 14px">Ein Klick ersetzt die aktuelle Folie. Die Farben folgen deinen Markenfarben.</p>';
+  vorlagenGalerie().forEach(v=>{
+    const b=document.createElement("button");b.type="button";
+    b.style.cssText="display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#e7ecf3;cursor:pointer;font:inherit";
+    b.innerHTML="<b>"+v.name+"</b><br><span style=\'font-size:12.5px;color:#8a94a6\'>"+v.hinweis+"</span>";
+    b.onclick=()=>{ladeDaten(v.daten);d.style.display="none";sichern();merke();if(reiter==="serie")formular();};
+    k.appendChild(b);});
+  const zu=document.createElement("button");zu.type="button";zu.textContent="Schlie\u00dfen";
+  zu.style.cssText="margin-top:6px;padding:10px 14px;border-radius:10px;border:0;background:rgba(255,255,255,.1);color:#cbd5e1;cursor:pointer;font:inherit";
+  zu.onclick=()=>d.style.display="none";
+  k.appendChild(zu);
+  d.appendChild(k);d.onclick=e=>{if(e.target===d)d.style.display="none";};
+  document.body.appendChild(d);
+}
+
+/* Bedienelemente einhaengen */
+(function(){
+  const halter=document.createElement("span");
+  halter.style.cssText="display:inline-flex;gap:4px;margin-left:10px;vertical-align:middle";
+  const knopf=(txt,titel,fn)=>{const b=document.createElement("button");b.type="button";b.textContent=txt;b.title=titel;
+    b.style.cssText="min-width:34px;padding:6px 9px;border-radius:8px;border:0;background:rgba(255,255,255,.08);color:#cbd5e1;font-size:15px;cursor:pointer";
+    b.onclick=fn;return b;};
+  halter.appendChild(knopf("\u21a9","Widerrufen (Strg/Cmd+Z)",widerrufen));
+  halter.appendChild(knopf("\u21aa","Wiederholen (Umschalt+Strg/Cmd+Z)",wiederholen));
+  const r=g("reiter");if(r)r.insertAdjacentElement("afterend",halter);
+
+  const f=g("format");
+  if(f){const l=document.createElement("label");
+    l.style.cssText="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px;color:#8a94a6;cursor:pointer";
+    l.innerHTML='<input type="checkbox"> Export in doppelter Aufl\u00f6sung';
+    f.insertAdjacentElement("afterend",l);
+    l.querySelector("input").onchange=e=>{window.__hochaufloesend=e.target.checked;};}
+
+  const png=document.querySelector('[onclick="exportPng()"]');
+  if(png&&navigator.canShare){const t=document.createElement("button");t.type="button";t.textContent="Teilen";
+    t.className=png.className;t.style.marginLeft="6px";t.onclick=teilen;
+    png.insertAdjacentElement("afterend",t);}
+
+  const laden=document.querySelector('[onclick="loadVorlage()"]');
+  if(laden){const b=document.createElement("button");b.type="button";b.textContent="Galerie";
+    b.className=laden.className;b.onclick=galerieZeigen;
+    laden.insertAdjacentElement("afterend",b);}
+})();
+
+
 window.__start=true;
-setFormat();bgPaint();schriftListe();schriftSetzen(SCHRIFT);addText();select(null);lagen();
+setFormat();bgPaint();schriftListe();schriftSetzen(SCHRIFT);if(!wiederherstellen())addText();select(null);lagen();setTimeout(merke,80);
 window.__start=false;
 if(window.innerWidth<=1100) autoZoom();
 let __t; window.addEventListener("resize", ()=>{ clearTimeout(__t);
