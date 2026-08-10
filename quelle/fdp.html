@@ -151,7 +151,9 @@ body.folie .el.sel .gr{display:block}
       <option value="1080x1920">Story 1080 × 1920</option>
       </optgroup>
       <optgroup label="Druck">
-      <option value="1240x1748">Flyer A6 · 105 × 148 mm</option>
+      <option value="1240x1748">Postkarte / Flyer A6 · 105 × 148 mm</option>
+      <option value="1748x1748">Postkarte quadratisch · 148 × 148 mm</option>
+      <option value="1169x2480">Flyer DIN lang · 99 × 210 mm</option>
       <option value="1748x2480">Flyer A5 · 148 × 210 mm</option>
       <option value="2480x3508">Plakat A4 · 210 × 297 mm</option>
       <option value="3508x4961">Plakat A3 · 297 × 420 mm</option>
@@ -698,9 +700,10 @@ function formular(){
 function daten(){return{name:g("vname").value,W,H,marke:MARKE.slice(),
   bg:{art:g("bgart").value,c:g("bg1").value,g1:g("gv1").value,g2:g("gv2").value,gw:g("gw").value,dk:g("dk").value,img:bgImg},
   els:els.map(({el,...r})=>r)};}
-function saveVorlage(){const a=document.createElement("a");
+async function saveVorlage(){const a=document.createElement("a");
   a.download=(g("vname").value||"vorlage").replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,"")+".vorlage.json";
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(daten())],{type:"application/json"}));a.click();}
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(daten())],{type:"application/json"}));a.click();
+  try{await vorlageInGalerie();}catch(e){}}
 function ladeDaten(d){
   neu();
   g("vname").value=d.name||"Vorlage";
@@ -859,6 +862,8 @@ async function serieExport(){
    Druckerei wandelt selbst nach CMYK. */
 const DRUCK={
   "1240x1748":{n:"A6",mm:[105,148]},
+  "1748x1748":{n:"Postkarte 148",mm:[148,148]},
+  "1169x2480":{n:"DIN lang",mm:[99,210]},
   "1748x2480":{n:"A5",mm:[148,210]},
   "2480x3508":{n:"A4",mm:[210,297]},
   "3508x4961":{n:"A3",mm:[297,420]},
@@ -1150,25 +1155,75 @@ function vorlagenGalerie(){
        Object.assign({},T,{t:"text",name:"Datum und Uhrzeit",x:88,y:850,w:904,text:"Mi \u00b7 24. September \u00b7 19 Uhr",size:40,color:m1,bgAn:true,bg:m0,pad:28,rad:12,fit:false}),
        Object.assign({},T,{t:"text",name:"Ort",x:88,y:1010,w:904,text:"Ort oder Link",size:32,weight:500,color:grau,fit:false})]}}];
 }
+/* Eigene Galerie: Beim Speichern einer Vorlage wird zusaetzlich ein kleines
+   Vorschaubild angelegt und alles lokal im Geraet abgelegt. Die Galerie zeigt
+   zuerst die eigenen Vorlagen, darunter die mitgelieferten Startpunkte. */
+const VORLAGEN="daumenkino.vorlagen";
+function eigeneVorlagen(){try{return JSON.parse(localStorage.getItem(VORLAGEN))||[];}catch(e){return [];}}
+function eigeneSichern(l){
+  try{localStorage.setItem(VORLAGEN,JSON.stringify(l));}
+  catch(e){ /* meist zu grosse Bilder: ohne Bilddaten erneut versuchen */
+    try{l.forEach(v=>{if(v.daten.bg)v.daten.bg.img=null;v.daten.els.forEach(o=>{if(o.t==="img")o.src=null;});});
+      localStorage.setItem(VORLAGEN,JSON.stringify(l));}catch(e2){}}}
+async function vorlageInGalerie(){
+  const cv=await bild();
+  const k=document.createElement("canvas");
+  const f=220/cv.width;k.width=220;k.height=Math.round(cv.height*f);
+  const x=k.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,k.width,k.height);
+  x.drawImage(cv,0,0,k.width,k.height);
+  const l=eigeneVorlagen();
+  const name=g("vname").value||"Vorlage";
+  const neu={name:name,bild:k.toDataURL("image/jpeg",0.72),daten:daten()};
+  const alt=l.findIndex(v=>v.name===name);          // gleicher Name ersetzt
+  if(alt>=0)l[alt]=neu;else l.unshift(neu);
+  eigeneSichern(l.slice(0,24));
+}
+function vorlageWeg(i){const l=eigeneVorlagen();l.splice(i,1);eigeneSichern(l);galerieZeigen();}
 function galerieZeigen(){
-  let d=g("galerie");
-  if(d){d.style.display="flex";return;}
-  d=document.createElement("div");d.id="galerie";
+  const alt=g("galerie");if(alt)alt.remove();
+  const d=document.createElement("div");d.id="galerie";
   d.style.cssText="position:fixed;inset:0;background:rgba(5,10,18,.72);display:flex;align-items:center;justify-content:center;z-index:60;padding:18px";
   const k=document.createElement("div");
-  k.style.cssText="background:#141a24;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:22px;max-width:430px;width:100%;max-height:85vh;overflow:auto";
-  k.innerHTML='<b style="font-size:17px">Vorlagen-Galerie</b><p style="font-size:13.5px;color:#8a94a6;margin:6px 0 14px">Ein Klick ersetzt die aktuelle Folie. Die Farben folgen deinen Markenfarben.</p>';
+  k.style.cssText="background:#141a24;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:22px;max-width:560px;width:100%;max-height:85vh;overflow:auto";
+  k.innerHTML='<b style="font-size:17px">Vorlagen-Galerie</b><p style="font-size:13.5px;color:#8a94a6;margin:6px 0 14px">Ein Klick ersetzt die aktuelle Folie.</p>';
+  const eigene=eigeneVorlagen();
+  if(eigene.length){
+    const ue=document.createElement("p");ue.textContent="Meine Vorlagen";
+    ue.style.cssText="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8a94a6;margin:2px 0 8px";
+    k.appendChild(ue);
+    const raster=document.createElement("div");
+    raster.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:16px";
+    eigene.forEach((v,i)=>{
+      const z=document.createElement("div");z.style.cssText="position:relative";
+      const b=document.createElement("button");b.type="button";b.title=v.name;
+      b.style.cssText="display:block;width:100%;padding:0;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);cursor:pointer;overflow:hidden;font:inherit;color:#e7ecf3";
+      b.innerHTML='<img src="'+v.bild+'" alt="" style="display:block;width:100%;height:auto">'
+        +'<span style="display:block;font-size:11.5px;padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+v.name.replace(/[<>&]/g,"")+"</span>";
+      b.onclick=()=>{ladeDaten(v.daten);d.remove();sichern();merke();if(reiter==="serie")formular();};
+      const wx=document.createElement("button");wx.type="button";wx.textContent="✕";wx.title="Aus der Galerie entfernen";
+      wx.style.cssText="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:6px;border:0;background:rgba(5,10,18,.72);color:#cbd5e1;cursor:pointer;font-size:11px;line-height:1";
+      wx.onclick=e=>{e.stopPropagation();vorlageWeg(i);};
+      z.appendChild(b);z.appendChild(wx);raster.appendChild(z);});
+    k.appendChild(raster);
+  }else{
+    const hin=document.createElement("p");
+    hin.textContent="Noch keine eigenen Vorlagen. Gestalte eine Folie und sichere sie im Reiter Serie mit „Vorlage speichern“ – dann erscheint sie hier mit Vorschaubild.";
+    hin.style.cssText="font-size:13px;color:#8a94a6;margin-bottom:14px";
+    k.appendChild(hin);}
+  const ue2=document.createElement("p");ue2.textContent="Startpunkte";
+  ue2.style.cssText="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8a94a6;margin:2px 0 8px";
+  k.appendChild(ue2);
   vorlagenGalerie().forEach(v=>{
     const b=document.createElement("button");b.type="button";
     b.style.cssText="display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#e7ecf3;cursor:pointer;font:inherit";
-    b.innerHTML="<b>"+v.name+"</b><br><span style=\'font-size:12.5px;color:#8a94a6\'>"+v.hinweis+"</span>";
-    b.onclick=()=>{ladeDaten(v.daten);d.style.display="none";sichern();merke();if(reiter==="serie")formular();};
+    b.innerHTML="<b>"+v.name+"</b><br><span style='font-size:12.5px;color:#8a94a6'>"+v.hinweis+"</span>";
+    b.onclick=()=>{ladeDaten(v.daten);d.remove();sichern();merke();if(reiter==="serie")formular();};
     k.appendChild(b);});
-  const zu=document.createElement("button");zu.type="button";zu.textContent="Schlie\u00dfen";
+  const zu=document.createElement("button");zu.type="button";zu.textContent="Schließen";
   zu.style.cssText="margin-top:6px;padding:10px 14px;border-radius:10px;border:0;background:rgba(255,255,255,.1);color:#cbd5e1;cursor:pointer;font:inherit";
-  zu.onclick=()=>d.style.display="none";
+  zu.onclick=()=>d.remove();
   k.appendChild(zu);
-  d.appendChild(k);d.onclick=e=>{if(e.target===d)d.style.display="none";};
+  d.appendChild(k);d.onclick=e=>{if(e.target===d)d.remove();};
   document.body.appendChild(d);
 }
 
