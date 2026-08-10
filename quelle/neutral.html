@@ -134,7 +134,7 @@ body.folie .el.sel .gr{display:block}
   </div>
   <div class="rechts">
     <button class="s" id="umschalt" style="display:none" onclick="seite()">Einstellen</button><button class="s" onclick="hilfe(1)">Hilfe</button><button class="s" onclick="impressum(1)">Impressum</button>
-    <button class="s p" onclick="exportPng()">PNG speichern</button>
+    <button class="s p" onclick="exportPng()">PNG speichern</button><button class="s druckzeug" style="display:none" onclick="exportPdf()">Druck-PDF</button>
   </div>
 </div>
 
@@ -145,10 +145,30 @@ body.folie .el.sel .gr{display:block}
 
     <h2>Format</h2>
     <select id="format">
+      <optgroup label="Instagram">
       <option value="1080x1350">Karussell 1080 × 1350</option>
       <option value="1080x1080">Quadrat 1080 × 1080</option>
       <option value="1080x1920">Story 1080 × 1920</option>
+      </optgroup>
+      <optgroup label="Druck">
+      <option value="1240x1748">Flyer A6 · 105 × 148 mm</option>
+      <option value="1748x2480">Flyer A5 · 148 × 210 mm</option>
+      <option value="2480x3508">Plakat A4 · 210 × 297 mm</option>
+      <option value="3508x4961">Plakat A3 · 297 × 420 mm</option>
+      <option value="3307x4677">Plakat A2 · 420 × 594 mm</option>
+      <option value="3508x4967">Plakat A1 · 594 × 841 mm</option>
+      <option value="4967x7022">Plakat A0 · 841 × 1189 mm</option>
+      </optgroup>
     </select>
+    <div class="druckzeug" style="display:none">
+      <label style="display:flex;gap:6px;align-items:center;margin-top:8px">
+        <input type="checkbox" id="quer" onchange="querUm()"> Querformat</label>
+      <label style="display:flex;gap:6px;align-items:center">
+        <input type="checkbox" id="beschnitt" checked> 3 mm Beschnitt anfügen</label>
+      <p class="hin" style="margin-top:4px">Druckformate ergeben ein PDF für die
+      Online-Druckerei. Wichtige Texte am besten 10 mm vom Rand fernhalten.</p>
+      <p class="hin" id="druckstatus"></p>
+    </div>
 
     <h2>Hintergrund</h2>
     <select id="bgart">
@@ -197,6 +217,7 @@ body.folie .el.sel .gr{display:block}
     <p class="hin" style="margin-top:0">Ein Block je Folie, Blöcke durch eine Leerzeile trennen. Innerhalb eines Blocks eine Zeile je Textfeld, Reihenfolge wie rechts.</p>
     <textarea id="serie" rows="14"></textarea>
     <button class="p" style="margin-top:7px" onclick="serieExport()">Serie als PNG laden</button>
+    <button class="druckzeug" style="display:none" onclick="seriePdf()">Serie als Druck-PDF laden</button>
     <p class="hin" id="seriestatus"></p>
   </section>
 
@@ -394,6 +415,12 @@ body.folie .el.sel .gr{display:block}
       <li>Die Vorschau zeigt, wo Instagram den Text mit „mehr“ abschneidet.</li>
       <li>Der Kontrastwert sagt, ob deine Schrift auf dem Hintergrund wirklich lesbar ist.</li>
     </ul>
+    <h4>Drucken</h4>
+    <ul>
+      <li>Unter Format stehen auch <b>Flyer und Plakate von A6 bis A0</b>, auf Wunsch quer.</li>
+      <li><b>Druck-PDF</b> erzeugt eine druckfertige Datei mit 3 mm Beschnitt für die Online-Druckerei. Wichtige Texte 10 mm vom Rand fernhalten.</li>
+      <li>Mit Serientexten wird daraus ein PDF mit mehreren Seiten, etwa für Vorder- und Rückseite eines Flyers.</li>
+    </ul>
     <p class="kl">Eigene Schriften lädst du unter Prüfen. Sie werden nur lokal verwendet.</p>
     <button class="p" onclick="hilfe(0)">Los geht es</button>
   </div>
@@ -486,6 +513,9 @@ function tab(t){
 }
 
 function setFormat(){ [W,H]=g("format").value.split("x").map(Number);
+  const df=DRUCK[g("format").value];
+  if(df&&g("quer")&&g("quer").checked){const t_=W;W=H;H=t_;}
+  document.querySelectorAll(".druckzeug").forEach(e=>e.style.display=df?"":"none");
   stage.style.width=W+"px"; stage.style.height=H+"px";
   const q=document.querySelector("#raster .q"); const s=Math.round((H-W)/2);
   q.style.top=s+"px"; q.style.height=W+"px"; fitHull(); }
@@ -720,7 +750,9 @@ function saveVorlage(){const a=document.createElement("a");
 function ladeDaten(d){
   neu();
   g("vname").value=d.name||"Vorlage";
-  if(d.W&&d.H&&[...g("format").options].some(o=>o.value===d.W+"x"+d.H))g("format").value=d.W+"x"+d.H;
+  if(d.W&&d.H){const oo=[...g("format").options].map(o=>o.value);
+    if(oo.includes(d.W+"x"+d.H)){g("format").value=d.W+"x"+d.H;if(g("quer"))g("quer").checked=false;}
+    else if(oo.includes(d.H+"x"+d.W)&&DRUCK[d.H+"x"+d.W]){g("format").value=d.H+"x"+d.W;if(g("quer"))g("quer").checked=true;}}
   setFormat();
   if(Array.isArray(d.marke)&&d.marke.length){MARKE=d.marke.slice();palette();}
   if(d.bg){g("bgart").value=d.bg.art||"farbe";if(d.bg.c)g("bg1").value=d.bg.c;
@@ -863,6 +895,101 @@ async function serieExport(){
   if(ordner){ g("seriestatus").textContent=`Fertig, ${bl.length} Folien liegen im gewählten Ordner.`;
               window.daumenkino.ordnerOeffnen(ordner); }
   else g("seriestatus").textContent=`Fertig, ${bl.length} Folien geladen.`;
+}
+
+/* ---------- Druck: Plakate und Flyer als PDF ----------
+   Die Druckformate rechnen in Millimetern (A6 bis A3 mit 300 dpi, A2 mit 200,
+   A1 und A0 mit 150 - mehr braucht ein Plakat nicht). Das PDF wird direkt hier
+   gebaut: eine JPEG-Seite je Folie, auf Wunsch mit 3 mm Beschnitt und
+   TrimBox, wie Online-Druckereien es erwarten. Farben sind RGB; die
+   Druckerei wandelt selbst nach CMYK. */
+const DRUCK={
+  "1240x1748":{n:"A6",mm:[105,148]},
+  "1748x2480":{n:"A5",mm:[148,210]},
+  "2480x3508":{n:"A4",mm:[210,297]},
+  "3508x4961":{n:"A3",mm:[297,420]},
+  "3307x4677":{n:"A2",mm:[420,594]},
+  "3508x4967":{n:"A1",mm:[594,841]},
+  "4967x7022":{n:"A0",mm:[841,1189]}};
+function querUm(){ setFormat(); if(window.innerWidth<=1100&&typeof autoZoom==="function")autoZoom();
+  if(typeof sichern==="function"){sichern();merke();} }
+function druckInfo(){const d=DRUCK[g("format").value];if(!d)return null;
+  const q=g("quer")&&g("quer").checked;
+  return {n:d.n+(q?" quer":""),b:q?d.mm[1]:d.mm[0],h:q?d.mm[0]:d.mm[1]};}
+function b64Bytes(dataUrl){const b=atob(dataUrl.split(",")[1]);const u=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
+function jpegVon(cv){const c=document.createElement("canvas");c.width=cv.width;c.height=cv.height;
+  const x=c.getContext("2d");x.fillStyle="#ffffff";x.fillRect(0,0,c.width,c.height);x.drawImage(cv,0,0);
+  return {jpg:b64Bytes(c.toDataURL("image/jpeg",0.95)),w:c.width,h:c.height};}
+function pdfBauen(seiten,bMM,hMM,beschnitt){
+  const PT=72/25.4,r=beschnitt?3:0,pb=(bMM+2*r)*PT,ph=(hMM+2*r)*PT,tr=r*PT;
+  const enc=new TextEncoder(),teile=[];let pos=0;
+  const roh=u=>{teile.push(u);pos+=u.length;};
+  const txt=s=>roh(enc.encode(s));
+  const offs=[0];let nr=0;
+  const anfang=()=>{offs[++nr]=pos;txt(nr+" 0 obj\n");return nr;};
+  const ende=()=>txt("endobj\n");
+  txt("%PDF-1.4\n");roh(new Uint8Array([37,226,227,207,211,10]));
+  const kinder=seiten.map((_,i)=>3+i*3);
+  anfang();txt("<< /Type /Catalog /Pages 2 0 R >>\n");ende();
+  anfang();txt("<< /Type /Pages /Count "+seiten.length+" /Kids ["+kinder.map(k=>k+" 0 R").join(" ")+"] >>\n");ende();
+  const z=x=>x.toFixed(2);
+  seiten.forEach(s=>{
+    const a=s.w/s.h;let dw,dh;      // Bild deckt die Seite samt Beschnitt, mittig
+    if(pb/ph>a){dw=pb;dh=pb/a;}else{dh=ph;dw=ph*a;}
+    const dx=(pb-dw)/2,dy=(ph-dh)/2;
+    const pg=anfang();
+    txt("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "+z(pb)+" "+z(ph)+"]"
+      +(r?" /TrimBox ["+z(tr)+" "+z(tr)+" "+z(pb-tr)+" "+z(ph-tr)+"]":"")
+      +" /Resources << /XObject << /I0 "+(pg+2)+" 0 R >> >> /Contents "+(pg+1)+" 0 R >>\n");ende();
+    const strom="q "+z(dw)+" 0 0 "+z(dh)+" "+z(dx)+" "+z(dy)+" cm /I0 Do Q";
+    anfang();txt("<< /Length "+strom.length+" >>\nstream\n"+strom+"\nendstream\n");ende();
+    anfang();txt("<< /Type /XObject /Subtype /Image /Width "+s.w+" /Height "+s.h
+      +" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+s.jpg.length+" >>\nstream\n");
+    roh(s.jpg);txt("\nendstream\n");ende();
+  });
+  const xref=pos;
+  txt("xref\n0 "+(nr+1)+"\n0000000000 65535 f \n");
+  for(let i=1;i<=nr;i++)txt(String(offs[i]).padStart(10,"0")+" 00000 n \n");
+  txt("trailer\n<< /Size "+(nr+1)+" /Root 1 0 R >>\nstartxref\n"+xref+"\n%%EOF");
+  return new Blob(teile,{type:"application/pdf"});
+}
+async function pdfRunter(blob,name){
+  if(window.daumenkino){
+    const url=await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(blob);});
+    await window.daumenkino.einzelSpeichern(name,url);return;}
+  const a=document.createElement("a");a.download=name;a.href=URL.createObjectURL(blob);a.click();
+}
+async function exportPdf(){
+  const d=druckInfo();const st=g("druckstatus");
+  if(!d){if(st)st.textContent="Erst oben ein Druckformat wählen.";return;}
+  if(st)st.textContent="PDF wird gebaut, bei großen Formaten dauert das einen Moment …";
+  try{
+    const cv=await bild();
+    const blob=pdfBauen([jpegVon(cv)],d.b,d.h,g("beschnitt").checked);
+    await pdfRunter(blob,(g("vname").value||"druck").replace(/[^\wäöüÄÖÜß _-]/g,"")+" "+d.n+".pdf");
+    if(st)st.textContent="Fertig. Das PDF ist druckfertig"+(g("beschnitt").checked?" und enthält 3 mm Beschnitt.":".");
+  }catch(e){if(st)st.textContent="Das hat nicht geklappt: "+e.message;}
+}
+async function seriePdf(){
+  const d=druckInfo();const st=g("seriestatus");
+  if(!d){st.textContent="Erst im Reiter Folie ein Druckformat wählen.";return;}
+  const tf=textfelder();
+  if(!tf.length){st.textContent="Diese Vorlage hat keine Textfelder.";return;}
+  const bl=g("serie").value.split(/\n\s*\n/).map(b=>b.split("\n")).filter(b=>b.join("").trim());
+  if(!bl.length){st.textContent="Keine Blöcke gefunden.";return;}
+  const sicher=tf.map(r=>r.text),seiten=[];
+  for(let i=0;i<bl.length;i++){
+    tf.forEach((r,k)=>{r.text=(bl[i][k]??"").trim();paint(r);});
+    autofelder().forEach(r=>{r.text=String(i+1).padStart(2,"0")+" / "+String(bl.length).padStart(2,"0");paint(r);});
+    formular();
+    st.textContent="Seite "+(i+1)+" von "+bl.length+" …";
+    seiten.push(jpegVon(await bild()));
+  }
+  tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular();
+  const blob=pdfBauen(seiten,d.b,d.h,g("beschnitt").checked);
+  await pdfRunter(blob,(g("vname").value||"druck").replace(/[^\wäöüÄÖÜß _-]/g,"")+" "+d.n+" Serie.pdf");
+  st.textContent="Fertig, ein PDF mit "+bl.length+" Seiten.";
 }
 
 /* ---------- Schnittstelle für KI-Agenten und Einbettung ----------

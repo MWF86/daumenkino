@@ -45,10 +45,11 @@ function sicherName(name) {
 }
 
 ipcMain.handle("einzel-speichern", async (_e, name, dataUrl) => {
+  const pdf = /\.pdf$/i.test(name);
   const { canceled, filePath } = await dialog.showSaveDialog(fenster, {
-    title: "Folie speichern",
+    title: pdf ? "Druck-PDF speichern" : "Folie speichern",
     defaultPath: sicherName(name),
-    filters: [{ name: "PNG-Bild", extensions: ["png"] }]
+    filters: [pdf ? { name: "PDF", extensions: ["pdf"] } : { name: "PNG-Bild", extensions: ["png"] }]
   });
   if (canceled || !filePath) return false;
   await fs.promises.writeFile(filePath, ausDataUrl(dataUrl));
