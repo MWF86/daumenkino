@@ -823,6 +823,7 @@ async function exportPng(){
   const cv=await bild(); const name=(g("vname").value||"folie")+".png"; const url=cv.toDataURL("image/png");
   // Im Programm ein richtiger Speichern-Dialog, im Browser ein Download
   if(window.daumenkino){ await window.daumenkino.einzelSpeichern(name,url); return; }
+  if(inStoreApp()){ await storeTeilen([name],[url]); return; }
   const a=document.createElement("a");a.download=name;a.href=url;a.click();
 }
 async function serieExport(){
@@ -845,13 +846,34 @@ async function serieExport(){
     g("seriestatus").textContent=`Folie ${i+1} von ${bl.length} …`;
     const cv=await bild(); const name=String(i+1).padStart(2,"0")+".png"; const url=cv.toDataURL("image/png");
     if(ordner){ await window.daumenkino.inOrdner(ordner,name,url); }
+    else if(inStoreApp()){ (window.__serieStapel=window.__serieStapel||[]).push([name,url]); }
     else{ const a=document.createElement("a");a.download=name;a.href=url;a.click();
           await new Promise(r=>setTimeout(r,420)); }
+  }
+  if(!ordner&&inStoreApp()&&window.__serieStapel){
+    const st=window.__serieStapel;window.__serieStapel=null;
+    g("seriestatus").textContent="Teilen-Blatt öffnet sich …";
+    await storeTeilen(st.map(x=>x[0]),st.map(x=>x[1]));
   }
   tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular();
   if(ordner){ g("seriestatus").textContent=`Fertig, ${bl.length} Folien liegen im gewählten Ordner.`;
               window.daumenkino.ordnerOeffnen(ordner); }
   else g("seriestatus").textContent=`Fertig, ${bl.length} Folien geladen.`;
+}
+
+/* ---------- Store-App (iOS): natives Teilen-Blatt ----------
+   In der App-Store-Fassung steckt dieselbe Quelle in einer nativen Huelle
+   (Capacitor). Downloads gibt es dort nicht - stattdessen oeffnet sich das
+   iOS-Teilen-Blatt: Bild sichern, AirDrop, Dateien, Mail und so weiter. */
+function inStoreApp(){return !!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());}
+async function storeTeilen(namen,dataUrls){
+  const P=window.Capacitor.Plugins;
+  const uris=[];
+  for(let i=0;i<dataUrls.length;i++){
+    const d=await P.Filesystem.writeFile({path:namen[i],data:dataUrls[i].split(",")[1],directory:"CACHE"});
+    uris.push(d.uri);
+  }
+  try{await P.Share.share({files:uris});}catch(e){/* abgebrochen */}
 }
 
 /* ---------- Druck: Plakate und Flyer als PDF ----------
@@ -914,9 +936,11 @@ function pdfBauen(seiten,bMM,hMM,beschnitt){
   return new Blob(teile,{type:"application/pdf"});
 }
 async function pdfRunter(blob,name){
-  if(window.daumenkino){
+  if(window.daumenkino||inStoreApp()){
     const url=await new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(blob);});
-    await window.daumenkino.einzelSpeichern(name,url);return;}
+    if(window.daumenkino){await window.daumenkino.einzelSpeichern(name,url);}
+    else{await storeTeilen([name],[url]);}
+    return;}
   const a=document.createElement("a");a.download=name;a.href=URL.createObjectURL(blob);a.click();
 }
 async function exportPdf(){
@@ -1081,7 +1105,8 @@ async function teilen(){
     const datei=new File([b],(g("vname").value||"folie")+".png",{type:"image/png"});
     if(navigator.canShare&&navigator.canShare({files:[datei]})){
       try{await navigator.share({files:[datei],title:"Daumenkino"});}catch(e){}
-    }else{const a=document.createElement("a");a.download=datei.name;a.href=URL.createObjectURL(b);a.click();}
+    }else if(inStoreApp()){const f=new FileReader();f.onload=()=>storeTeilen([datei.name],[f.result]);f.readAsDataURL(b);}
+    else{const a=document.createElement("a");a.download=datei.name;a.href=URL.createObjectURL(b);a.click();}
   },"image/png");
 }
 
