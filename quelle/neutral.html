@@ -375,7 +375,7 @@ body.folie .el.sel .gr{display:block}
   <div class="k">
     <h3>Daumenkino</h3>
     <p class="kl">Ein Werkzeug für Instagram-Karussells. Läuft in jedem Browser, ohne Konto, ohne Cloud.
-    Es wird nichts hochgeladen und nichts gespeichert. Alles bleibt auf deinem Rechner.</p>
+    Es wird nichts hochgeladen und nichts gespeichert. Alles bleibt auf deinem Rechner. Einzige Ausnahme: die freiwillige KI-Texthilfe im Reiter Prüfen – sie sendet erst nach deinem Klick Texte an die KI Claude (Anthropic).</p>
     <h4>Folie</h4>
     <ol>
       <li>Format wählen, Hintergrund als Farbe, Verlauf oder eigenes Bild.</li>
@@ -999,6 +999,49 @@ async function teilen(){
   },"image/png");
 }
 
+/* KI-Texthilfe (freiwillig): schreibt auf Klick einen Caption-Vorschlag.
+   Nur dann werden Folientexte und Caption an die Anthropic-Schnittstelle
+   gesendet, mit dem eigenen Schluessel des Nutzers. Sonst laeuft alles
+   weiterhin komplett ohne Internet. */
+const THS="daumenkino.texthilfe.schluessel";
+function texthilfeTexte(){
+  const s=g("serie").value.trim();
+  if(s)return "Serientexte des Karussells (ein Block je Folie):\n"+s;
+  const t=els.filter(r=>r.t==="text"&&(r.text||"").trim()).map(r=>r.name+": "+r.text).join("\n");
+  return t?("Texte der aktuellen Folie:\n"+t):"";
+}
+async function texthilfe(){
+  const hin=g("thHin"),schl=(g("thSchl").value||"").trim();
+  if(!schl){hin.textContent="Bitte zuerst einen Anthropic-Schlüssel eintragen.";return;}
+  try{localStorage.setItem(THS,schl);}catch(e){}
+  const wunsch=(g("thWunsch").value||"").trim();
+  const cap=g("caption").value.trim();
+  const kontext=texthilfeTexte();
+  if(!kontext&&!cap&&!wunsch){hin.textContent="Dafür braucht die KI etwas Futter: erst Folientexte, eine Caption oder einen Wunsch eintragen.";return;}
+  const regeln="Höchstlänge "+(g("rMax").value||2200)+" Zeichen, höchstens "+(g("rTags").value||30)+" Hashtags"
+    +(((g("rWort").value||"").trim())?(", diese Wörter vermeiden: "+g("rWort").value):"");
+  const auftrag=cap?("Verbessere diese Instagram-Caption, behalte Inhalt und Absicht bei:\n"+cap)
+                   :"Schreibe eine Instagram-Caption zu diesem Beitrag.";
+  const frage=[auftrag,kontext,(wunsch?("Wunsch: "+wunsch):""),"Regeln: "+regeln].filter(Boolean).join("\n\n");
+  hin.textContent="Die KI schreibt …";
+  try{
+    const antwort=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+      headers:{"content-type":"application/json","x-api-key":schl,
+        "anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:"claude-opus-5",max_tokens:1500,
+        system:"Du schreibst deutschsprachige Instagram-Captions: klar, natürlich, ohne Floskeln, mit kurzen Absätzen und passenden Hashtags am Ende. Antworte nur mit der fertigen Caption, ohne Anführungszeichen und ohne Erklärung.",
+        messages:[{role:"user",content:frage}]})});
+    if(!antwort.ok){const f=await antwort.json().catch(()=>null);
+      hin.textContent="Fehler "+antwort.status+": "+((f&&f.error&&f.error.message)||"Anfrage abgelehnt. Stimmt der Schlüssel?");return;}
+    const d=await antwort.json();
+    if(d.stop_reason==="refusal"){hin.textContent="Die KI hat diese Anfrage abgelehnt. Formuliere den Wunsch anders und versuch es erneut.";return;}
+    const text=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+    if(!text){hin.textContent="Keine Antwort erhalten. Bitte noch einmal versuchen.";return;}
+    g("caption").value=text;capPruef();sichern();merke();
+    hin.textContent="Vorschlag eingesetzt. Gefällt er nicht: noch einmal klicken oder mit ↩ zurück.";
+  }catch(e){hin.textContent="Keine Verbindung. Die Texthilfe ist das Einzige hier, das Internet braucht.";}
+}
+
 /* Vorlagen-Galerie, Farben folgen den Markenfarben */
 function vorlagenGalerie(){
   const m0=MARKE[0],m1=MARKE[1],m2=MARKE[2],grau=MARKE[MARKE.length-1];
@@ -1075,6 +1118,16 @@ function galerieZeigen(){
   if(laden){const b=document.createElement("button");b.type="button";b.textContent="Galerie";
     b.className=laden.className;b.onclick=galerieZeigen;
     laden.insertAdjacentElement("afterend",b);}
+  const cap=g("caption");
+  if(cap){const w=document.createElement("div");
+    w.innerHTML='<h2>KI-Texthilfe</h2>'
+     +'<p class="hin" style="margin-top:0">Freiwillig. Erst wenn du auf den Knopf klickst, werden Folientexte und Caption an die KI Claude (Anthropic) geschickt, die einen Vorschlag schreibt. Dafür brauchst du einen eigenen Schlüssel von console.anthropic.com – er bleibt nur auf diesem Gerät gespeichert.</p>'
+     +'<label>Anthropic-Schlüssel</label><input type="password" id="thSchl" placeholder="sk-ant-…" autocomplete="off">'
+     +'<label>Wunsch (freiwillig)</label><input type="text" id="thWunsch" placeholder="z. B. locker, mit Frage am Ende">'
+     +'<button class="p" style="margin-top:7px" onclick="texthilfe()">Caption vorschlagen</button>'
+     +'<p class="hin" id="thHin"></p>';
+    cap.insertAdjacentElement("afterend",w);
+    try{const s=localStorage.getItem(THS);if(s)w.querySelector("#thSchl").value=s;}catch(e){}}
 })();
 
 
