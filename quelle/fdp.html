@@ -582,7 +582,10 @@ function paint(r){
     if(r.fit){let x=r.size,gd=0;r.el.style.fontSize=x+"px";
       while(r.el.scrollWidth>r.el.clientWidth+2&&x>14&&gd++<220){x-=2;r.el.style.fontSize=x+"px";}}
   }else if(r.t==="img"){
-    r.el.innerHTML=`<img src="${r.src}" style="width:100%;height:100%;object-fit:cover;border-radius:${r.radius}px;display:block">`;
+    r.el.textContent="";
+    const bb=document.createElement("img");bb.src=r.src||"";
+    bb.style.cssText=`width:100%;height:100%;object-fit:cover;border-radius:${r.radius||0}px;display:block`;
+    r.el.appendChild(bb);
     s.height=r.h+"px";s.background="none";
   }else{
     r.el.textContent="";s.height=r.h+"px";s.background=r.fill;
@@ -671,7 +674,7 @@ function lagen(){
   const box=g("lagen");box.innerHTML="";
   [...els].reverse().forEach(r=>{
     const d=document.createElement("div");d.className=r===sel?"on":"";
-    const t=r.t==="text"?`<b>${r.name}</b>${r.alle||r.auto?" ⟳":""} · ${(r.text||"").slice(0,14)}`:r.name;
+    const t=r.t==="text"?`<b>${esc(r.name)}</b>${r.alle||r.auto?" ⟳":""} · ${esc((r.text||"").slice(0,14))}`:esc(r.name);
     d.innerHTML=`<span>${t}</span><span class="x">✕</span>`;
     d.onclick=e=>{if(e.target.classList.contains("x")){r.el.remove();els=els.filter(x=>x!==r);if(sel===r)select(null);lagen();}
       else select(r);};
@@ -693,7 +696,7 @@ function formular(){
   const box=g("felder");box.innerHTML="";
   const tf=textfelder();g("keinefelder").style.display=tf.length?"none":"";
   tf.forEach(r=>{const d=document.createElement("div");d.className="feld";
-    d.innerHTML=`<label>${r.name}</label><textarea rows="2"></textarea>`;
+    d.innerHTML=`<label>${esc(r.name)}</label><textarea rows="2"></textarea>`;
     const ta=d.querySelector("textarea");ta.value=r.text;
     ta.oninput=()=>{r.text=ta.value;paint(r);};box.appendChild(d);});
 }
@@ -703,7 +706,7 @@ function daten(){return{name:g("vname").value,W,H,marke:MARKE.slice(),
 async function saveVorlage(){const a=document.createElement("a");
   a.download=(g("vname").value||"vorlage").replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g,"")+".vorlage.json";
   a.href=URL.createObjectURL(new Blob([JSON.stringify(daten())],{type:"application/json"}));a.click();
-  try{await vorlageInGalerie();}catch(e){}}
+  try{await vorlageInGalerie();}catch(e){const st=g("seriestatus");if(st)st.textContent="Vorlagendatei gespeichert, Galerie-Eintrag fehlgeschlagen: "+(e.message||e);}}
 function ladeDaten(d){
   neu();
   g("vname").value=d.name||"Vorlage";
@@ -755,7 +758,7 @@ function kontrast(){
     const grenze=gross?3:4.5;
     const kl=v>=grenze?"ok":(v>=grenze-1.2?"warn":"bad");
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${r.name}<div class="hin" style="margin:0">${gross?"große":"kleine"} Schrift, mindestens ${grenze.toFixed(1)}</div></td>
+    tr.innerHTML=`<td>${esc(r.name)}<div class="hin" style="margin:0">${gross?"große":"kleine"} Schrift, mindestens ${grenze.toFixed(1)}</div></td>
                   <td class="${kl}">${v.toFixed(1)}</td>`;
     t.appendChild(tr);});
 }
@@ -820,11 +823,13 @@ async function bild(){
   return cv;
 }
 async function exportPng(){
-  const cv=await bild(); const name=(g("vname").value||"folie")+".png"; const url=cv.toDataURL("image/png");
-  // Im Programm ein richtiger Speichern-Dialog, im Browser ein Download
-  if(window.daumenkino){ await window.daumenkino.einzelSpeichern(name,url); return; }
-  if(inStoreApp()){ await storeTeilen([name],[url]); return; }
-  const a=document.createElement("a");a.download=name;a.href=url;a.click();
+  try{
+    const cv=await bild(); const name=(g("vname").value||"folie")+".png"; const url=cv.toDataURL("image/png");
+    // Im Programm ein richtiger Speichern-Dialog, im Browser ein Download
+    if(window.daumenkino){ await window.daumenkino.einzelSpeichern(name,url); return; }
+    if(inStoreApp()){ await storeTeilen([name],[url]); return; }
+    const a=document.createElement("a");a.download=name;a.href=url;a.click();
+  }catch(e){ alert("Speichern oder Teilen hat nicht geklappt: "+(e.message||e)); }
 }
 async function serieExport(){
   const tf=textfelder();
@@ -839,26 +844,29 @@ async function serieExport(){
     if(!ordner){g("seriestatus").textContent="Abgebrochen.";return;}
   }
   const sicher=tf.map(r=>r.text);
-  for(let i=0;i<bl.length;i++){
-    tf.forEach((r,k)=>{r.text=(bl[i][k]??"").trim();paint(r);});
-    autofelder().forEach(r=>{r.text=String(i+1).padStart(2,"0")+" / "+String(bl.length).padStart(2,"0");paint(r);});
-    formular();
-    g("seriestatus").textContent=`Folie ${i+1} von ${bl.length} …`;
-    const cv=await bild(); const name=String(i+1).padStart(2,"0")+".png"; const url=cv.toDataURL("image/png");
-    if(ordner){ await window.daumenkino.inOrdner(ordner,name,url); }
-    else if(inStoreApp()){ (window.__serieStapel=window.__serieStapel||[]).push([name,url]); }
-    else{ const a=document.createElement("a");a.download=name;a.href=url;a.click();
-          await new Promise(r=>setTimeout(r,420)); }
-  }
-  if(!ordner&&inStoreApp()&&window.__serieStapel){
-    const st=window.__serieStapel;window.__serieStapel=null;
-    g("seriestatus").textContent="Teilen-Blatt öffnet sich …";
-    await storeTeilen(st.map(x=>x[0]),st.map(x=>x[1]));
-  }
-  tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular();
-  if(ordner){ g("seriestatus").textContent=`Fertig, ${bl.length} Folien liegen im gewählten Ordner.`;
-              window.daumenkino.ordnerOeffnen(ordner); }
-  else g("seriestatus").textContent=`Fertig, ${bl.length} Folien geladen.`;
+  window.__serieStapel=null;   // Reste eines frueheren Abbruchs verwerfen
+  try{
+    for(let i=0;i<bl.length;i++){
+      tf.forEach((r,k)=>{r.text=(bl[i][k]??"").trim();paint(r);});
+      autofelder().forEach(r=>{r.text=String(i+1).padStart(2,"0")+" / "+String(bl.length).padStart(2,"0");paint(r);});
+      formular();
+      g("seriestatus").textContent=`Folie ${i+1} von ${bl.length} …`;
+      const cv=await bild(); const name=String(i+1).padStart(2,"0")+".png"; const url=cv.toDataURL("image/png");
+      if(ordner){ await window.daumenkino.inOrdner(ordner,name,url); }
+      else if(inStoreApp()){ (window.__serieStapel=window.__serieStapel||[]).push([name,url]); }
+      else{ const a=document.createElement("a");a.download=name;a.href=url;a.click();
+            await new Promise(r=>setTimeout(r,420)); }
+    }
+    if(!ordner&&inStoreApp()&&window.__serieStapel){
+      const st=window.__serieStapel;window.__serieStapel=null;
+      g("seriestatus").textContent="Teilen-Blatt öffnet sich …";
+      await storeTeilen(st.map(x=>x[0]),st.map(x=>x[1]));
+    }
+    if(ordner){ g("seriestatus").textContent=`Fertig, ${bl.length} Folien liegen im gewählten Ordner.`;
+                window.daumenkino.ordnerOeffnen(ordner); }
+    else g("seriestatus").textContent=`Fertig, ${bl.length} Folien geladen.`;
+  }catch(e){ g("seriestatus").textContent="Das hat nicht geklappt: "+(e.message||e); window.__serieStapel=null; }
+  finally{ tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular(); }
 }
 
 /* ---------- Store-App (iOS): natives Teilen-Blatt ----------
@@ -870,7 +878,8 @@ async function storeTeilen(namen,dataUrls){
   const P=window.Capacitor.Plugins;
   const uris=[];
   for(let i=0;i<dataUrls.length;i++){
-    const d=await P.Filesystem.writeFile({path:namen[i],data:dataUrls[i].split(",")[1],directory:"CACHE"});
+    const b64=dataUrls[i].split(",")[1]??dataUrls[i];   // auch ohne data:-Vorspann
+    const d=await P.Filesystem.writeFile({path:namen[i],data:b64,directory:"CACHE"});
     uris.push(d.uri);
   }
   try{await P.Share.share({files:uris});}catch(e){/* abgebrochen */}
@@ -901,7 +910,9 @@ function b64Bytes(dataUrl){const b=atob(dataUrl.split(",")[1]);const u=new Uint8
   for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
 function jpegVon(cv){const c=document.createElement("canvas");c.width=cv.width;c.height=cv.height;
   const x=c.getContext("2d");x.fillStyle="#ffffff";x.fillRect(0,0,c.width,c.height);x.drawImage(cv,0,0);
-  return {jpg:b64Bytes(c.toDataURL("image/jpeg",0.95)),w:c.width,h:c.height};}
+  const jpg=b64Bytes(c.toDataURL("image/jpeg",0.95));
+  if(!jpg.length)throw new Error("Das Bild konnte nicht erzeugt werden – dieses Format ist für den Speicher dieses Geräts zu groß.");
+  return {jpg:jpg,w:c.width,h:c.height};}
 function pdfBauen(seiten,bMM,hMM,beschnitt){
   const PT=72/25.4,r=beschnitt?3:0,pb=(bMM+2*r)*PT,ph=(hMM+2*r)*PT,tr=r*PT;
   const enc=new TextEncoder(),teile=[];let pos=0;
@@ -948,7 +959,8 @@ async function exportPdf(){
   if(!d){if(st)st.textContent="Erst oben ein Druckformat wählen.";return;}
   if(st)st.textContent="PDF wird gebaut, bei großen Formaten dauert das einen Moment …";
   try{
-    const cv=await bild();
+    const ha=window.__hochaufloesend;window.__hochaufloesend=false;   // Druck rechnet schon in Druckaufloesung
+    let cv;try{cv=await bild();}finally{window.__hochaufloesend=ha;}
     const blob=pdfBauen([jpegVon(cv)],d.b,d.h,g("beschnitt").checked);
     await pdfRunter(blob,(g("vname").value||"druck").replace(/[^\wäöüÄÖÜß _-]/g,"")+" "+d.n+".pdf");
     if(st)st.textContent="Fertig. Das PDF ist druckfertig"+(g("beschnitt").checked?" und enthält 3 mm Beschnitt.":".");
@@ -962,17 +974,20 @@ async function seriePdf(){
   const bl=g("serie").value.split(/\n\s*\n/).map(b=>b.split("\n")).filter(b=>b.join("").trim());
   if(!bl.length){st.textContent="Keine Blöcke gefunden.";return;}
   const sicher=tf.map(r=>r.text),seiten=[];
-  for(let i=0;i<bl.length;i++){
-    tf.forEach((r,k)=>{r.text=(bl[i][k]??"").trim();paint(r);});
-    autofelder().forEach(r=>{r.text=String(i+1).padStart(2,"0")+" / "+String(bl.length).padStart(2,"0");paint(r);});
-    formular();
-    st.textContent="Seite "+(i+1)+" von "+bl.length+" …";
-    seiten.push(jpegVon(await bild()));
-  }
-  tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular();
-  const blob=pdfBauen(seiten,d.b,d.h,g("beschnitt").checked);
-  await pdfRunter(blob,(g("vname").value||"druck").replace(/[^\wäöüÄÖÜß _-]/g,"")+" "+d.n+" Serie.pdf");
-  st.textContent="Fertig, ein PDF mit "+bl.length+" Seiten.";
+  const ha=window.__hochaufloesend;window.__hochaufloesend=false;   // Druck rechnet schon in Druckaufloesung
+  try{
+    for(let i=0;i<bl.length;i++){
+      tf.forEach((r,k)=>{r.text=(bl[i][k]??"").trim();paint(r);});
+      autofelder().forEach(r=>{r.text=String(i+1).padStart(2,"0")+" / "+String(bl.length).padStart(2,"0");paint(r);});
+      formular();
+      st.textContent="Seite "+(i+1)+" von "+bl.length+" …";
+      seiten.push(jpegVon(await bild()));
+    }
+    const blob=pdfBauen(seiten,d.b,d.h,g("beschnitt").checked);
+    await pdfRunter(blob,(g("vname").value||"druck").replace(/[^\wäöüÄÖÜß _-]/g,"")+" "+d.n+" Serie.pdf");
+    st.textContent="Fertig, ein PDF mit "+bl.length+" Seiten.";
+  }catch(e){ st.textContent="Das hat nicht geklappt: "+(e.message||e); }
+  finally{ window.__hochaufloesend=ha; tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular(); }
 }
 
 /* ---------- Schnittstelle für KI-Agenten und Einbettung ----------
@@ -1189,7 +1204,9 @@ function eigeneSichern(l){
   try{localStorage.setItem(VORLAGEN,JSON.stringify(l));}
   catch(e){ /* meist zu grosse Bilder: ohne Bilddaten erneut versuchen */
     try{l.forEach(v=>{if(v.daten.bg)v.daten.bg.img=null;v.daten.els.forEach(o=>{if(o.t==="img")o.src=null;});});
-      localStorage.setItem(VORLAGEN,JSON.stringify(l));}catch(e2){}}}
+      localStorage.setItem(VORLAGEN,JSON.stringify(l));
+      const st=g("seriestatus");if(st)st.textContent="Hinweis: Wenig Speicher – die Galerie wurde ohne eingebettete Bilder gesichert.";
+    }catch(e2){alert("Die Vorlage konnte nicht in der Galerie gesichert werden: Der lokale Speicher ist voll. Lösche in der Galerie alte Vorlagen.");}}}
 async function vorlageInGalerie(){
   const cv=await bild();
   const k=document.createElement("canvas");
