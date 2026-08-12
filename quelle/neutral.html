@@ -216,6 +216,10 @@ select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
     <button onclick="addLine()">＋ Strich</button>
     <button onclick="addImg()">＋ Bild</button>
 
+    <h2>Serie</h2>
+    <button class="p" onclick="folgeFolie()">＋ Nächste Folie</button>
+    <p class="hin" style="margin-top:4px" id="folgehin"></p>
+
     <h2>Ebenen</h2>
     <div id="lagen"></div>
     <div style="margin-top:6px">
@@ -542,6 +546,7 @@ function tab(t){
   document.querySelectorAll("aside#links .seite").forEach(s=>s.style.display=s.classList.contains(t)?"":"none");
   [...g("reiter").children].forEach((b,i)=>b.classList.toggle("on", ["folie","serie","pruefen"][i]===t));
   ["folie","serie","pruefen"].forEach(x=>g("s_"+x).classList.toggle("on", x===t));
+  if(t==="folie"){ folgeHinweis(); }
   if(t==="serie"){ select(null); formular(); bauer(); }
   if(t==="pruefen"){ select(null); pruefen(); }
 }
@@ -868,12 +873,37 @@ function serieFelder(i){
   return textfelder().map(r=>r.name||"Text");
 }
 function folieDazu(){
-  serieAusrichten(); SERIE_TPL.push(null);
-  geaendert(); bauer();
+  serieAusrichten();
+  const tf=textfelder();
+  // Ist die Serie noch leer, wird die gerade gestaltete Folie ihre erste.
+  // Sonst muesste man abtippen, was schon fertig auf der Buehne steht.
+  if(!serieRoh().length && !SERIE_TPL.length && tf.some(r=>(r.text||"").trim())){
+    SERIE_TPL.push(null);
+    serieSchreiben([tf.map(r=>(r.text||"").replace(/\s*\n\s*/g," "))]);
+  }
+  SERIE_TPL.push(null);
+  geaendert(); bauer(); folgeHinweis();
   // Gleich ins erste Feld der neuen Folie springen
   const k=g("sbauer").querySelectorAll(".sfolie");
   const ta=k.length?k[k.length-1].querySelector("textarea"):null;
   if(ta) ta.focus();
+}
+// Knopf im Reiter Folie: fertige Folie in die Serie uebernehmen und gleich
+// die naechste anfangen. Aussehen, Format und Seitenzahl laufen mit.
+function folgeFolie(){
+  if(!textfelder().length){
+    folgeHinweis("Diese Folie hat noch keine benannten Textfelder. Gib jedem Textfeld rechts einen Feldnamen, dann weiß die Serie, welcher Text wohin gehört.");
+    return;
+  }
+  tab("serie"); folieDazu();
+}
+function folgeHinweis(txt){
+  const p=g("folgehin"); if(!p) return;
+  if(txt!=null){ p.textContent=txt; return; }
+  const n=serienFolien().length, tf=textfelder().length;
+  p.textContent=!tf ? "Gib den Textfeldern rechts erst einen Feldnamen."
+    : n ? "Die Serie hat "+(n===1?"1 Folie":n+" Folien")+". Der Knopf hängt eine weitere an."
+        : "Übernimmt diese Folie als erste der Serie und öffnet gleich die zweite – gleiches Aussehen, nur neue Texte.";
 }
 function folieWeg(i){
   const bl=serieRoh(); serieAusrichten();
@@ -964,8 +994,8 @@ function bauer(){
   leerHinweis(serienFolien().length);
 }
 function leerHinweis(n){
-  const h=g("sbauerhin"); if(!h) return;
-  h.textContent=n?(n===1?"1 Folie":n+" Folien")+" werden ausgegeben.":"";
+  const h=g("sbauerhin"); if(h) h.textContent=n?(n===1?"1 Folie":n+" Folien")+" werden ausgegeben.":"";
+  folgeHinweis();
 }
 
 function daten(){return{name:g("vname").value,W,H,marke:MARKE.slice(),schrift:SCHRIFT,
@@ -1812,7 +1842,7 @@ function galerieZeigen(){
 
 
 window.__start=true;
-setFormat();bgPaint();schriftDateiHolen();schriftListe();schriftSetzen(SCHRIFT);if(!wiederherstellen())addText();select(null);lagen();bauer();setTimeout(merke,80);
+setFormat();bgPaint();schriftDateiHolen();schriftListe();schriftSetzen(SCHRIFT);if(!wiederherstellen())addText();select(null);lagen();bauer();folgeHinweis();setTimeout(merke,80);
 window.__start=false;
 if(window.innerWidth<=1100) autoZoom();
 let __t; window.addEventListener("resize", ()=>{ clearTimeout(__t);
