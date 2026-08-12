@@ -185,6 +185,15 @@ body.folie .el.sel .gr{display:block}
       <button onclick="bgUpload()">Anderes Bild</button><button onclick="bgWeg()">Entfernen</button>
       <label>Abdunkeln <span id="dkl">0</span> %</label><input type="range" id="dk" min="0" max="85" value="0"></div>
 
+    <h2>Schrift</h2>
+    <label>Schrift der Folie</label>
+    <select id="fsel" onchange="schriftSetzen(this.value)"></select>
+    <button style="margin-top:7px" onclick="fontUpload()">＋ Eigene Schrift laden</button>
+    <p class="hin" style="margin-top:2px">TTF, OTF oder WOFF2 von deinem Rechner. Die Datei bleibt auf
+    dem Ger&auml;t und wird nirgends hochgeladen. Sie gilt f&uuml;r alle Texte der Folie und wird
+    mit gespeichert, die Schriftdatei selbst aber nicht weitergegeben.</p>
+    <p class="hin" id="fhin"></p>
+
     <h2>Einfügen</h2>
     <button onclick="addText()">＋ Textfeld</button>
     <button onclick="addKasten()">＋ Textkasten</button>
@@ -244,14 +253,6 @@ body.folie .el.sel .gr{display:block}
     </div>
     <p class="hin">Beliebig viele Farben. Klick auf eine Farbe zum Ändern, das ✕ entfernt sie.
     Die Palette erscheint überall dort, wo du eine Farbe wählst, und wird mit der Vorlage gespeichert.</p>
-    <h2>Schrift</h2>
-    <label>Schrift der Folie</label>
-    <select id="fsel" onchange="schriftSetzen(this.value)"></select>
-    <button style="margin-top:7px" onclick="fontUpload()">＋ Eigene Schrift laden</button>
-    <p class="hin" style="margin-top:2px">TTF, OTF oder WOFF2 von deinem Rechner. Die Datei bleibt auf
-    dem Ger&auml;t und wird nirgends hochgeladen. Geladene Schriften stehen zur Auswahl, bis du das
-    Fenster schlie&szlig;t.</p>
-    <p class="hin" id="fhin"></p>
   </section>
 </aside>
 
@@ -340,6 +341,12 @@ body.folie .el.sel .gr{display:block}
       <div class="hin">Ab 4,5 gilt Text als gut lesbar, große Schrift ab 3,0.</div>
     </div>
     <div class="pruef">
+      <h3>Bildauflösung für den Druck</h3>
+      <table class="tabelle" id="pBilder"></table>
+      <div class="hin" id="pBilderHin">Unter 150 dpi wird ein Bild im Druck sichtbar unscharf.
+      Für Flyer und alles, was man in die Hand nimmt, sind 300 dpi das Ziel.</div>
+    </div>
+    <div class="pruef">
       <h3>So sieht es im Profil aus</h3>
       <div id="gitter"></div>
       <div class="hin">Die aktuelle Folie im quadratischen Beschnitt.</div>
@@ -403,6 +410,7 @@ body.folie .el.sel .gr{display:block}
     <ol>
       <li>Format wählen, Hintergrund als Farbe, Verlauf oder eigenes Bild.</li>
       <li>Textfelder, Flächen, Kreise, Striche und Bilder einfügen, frei ziehen, rechts einstellen.</li>
+      <li>Unter <b>Schrift</b> die Schrift der ganzen Folie wählen oder eine eigene Schriftdatei laden.</li>
       <li><b>Profilraster einblenden</b> zeigt, was Instagram in deinem Profil abschneidet.</li>
     </ol>
     <h4>Serie</h4>
@@ -423,7 +431,8 @@ body.folie .el.sel .gr{display:block}
       <li><b>Druck-PDF</b> erzeugt eine druckfertige Datei mit 3 mm Beschnitt für die Online-Druckerei. Wichtige Texte 10 mm vom Rand fernhalten.</li>
       <li>Mit Serientexten wird daraus ein PDF mit mehreren Seiten, etwa für Vorder- und Rückseite eines Flyers.</li>
     </ul>
-    <p class="kl">Eigene Schriften lädst du unter Prüfen. Sie werden nur lokal verwendet.</p>
+    <p class="kl">Eigene Schriften lädst du im Reiter Folie unter Schrift. Die Schriftdatei bleibt auf deinem Gerät
+    und wird mit der Vorlage nicht weitergegeben – nur der Name der Schrift.</p>
     <button class="p" onclick="hilfe(0)">Los geht es</button>
   </div>
 </div>
@@ -478,6 +487,8 @@ const stage=g("stage"), hull=g("hull");
 let els=[], sel=null, W=1080, H=1350, uid=0, bgImg=null, reiter="folie";
 let MARKE=["#2fd0bd", "#22303f", "#0c8577", "#ffffff", "#101820", "#8a94a6"];
 let SCHRIFT="Poppins";
+// Selbst geladene Schriftdatei: {name, url}. Liegt im Geraetespeicher, nicht in der Vorlage.
+let SCHRIFT_DATEI=null;
 
 function palette(){
   const box=g("palette"); box.innerHTML="";
@@ -571,8 +582,40 @@ function schriftSetzen(id){
   stage.style.setProperty("--schrift",f.stack);
   const s=g("fsel"); if(s) s.value=f.id;
   if(typeof els!=="undefined") els.forEach(paint);
+  if(typeof geaendert==="function") geaendert();
 }
 function fontHinweis(txt){const p=g("fhin"); if(p) p.textContent=txt||"";}
+// Traegt eine Schriftdatei ein, ohne auf das Laden zu warten. Die Auswahl steht damit
+// sofort bereit, die Buchstaben erscheinen, sobald der Browser die Datei gelesen hat.
+function fontEintragen(name,d){
+  let ff;
+  try{ ff=new FontFace(name,"url("+d+")"); }catch(e){ return null; }
+  try{ document.fonts.add(ff); }catch(e){ return null; }
+  if(!SCHRIFTEN.some(x=>x.id===name))
+    SCHRIFTEN.push({id:name,label:name+" · geladen",stack:'"'+name+'", system-ui, sans-serif'});
+  return ff;
+}
+const SCHRIFT_SPEICHER="daumenkino.schrift";
+// Sehr grosse Dateien bleiben draussen, sonst verdraengen sie die Autosicherung der Folie.
+const SCHRIFT_MAX=3*1024*1024;
+function schriftDateiSichern(){
+  try{
+    if(!SCHRIFT_DATEI){ localStorage.removeItem(SCHRIFT_SPEICHER); return true; }
+    if(SCHRIFT_DATEI.url.length>SCHRIFT_MAX){ localStorage.removeItem(SCHRIFT_SPEICHER); return false; }
+    localStorage.setItem(SCHRIFT_SPEICHER,JSON.stringify(SCHRIFT_DATEI));
+    return true;
+  }catch(e){ return false; /* Speicher voll: die Schrift gilt dann nur bis zum Schliessen */ }
+}
+// Beim Start die zuletzt geladene Schrift zurueckholen, damit die Vorlage sie wiederfindet.
+function schriftDateiHolen(){
+  let s=null;
+  try{ s=JSON.parse(localStorage.getItem(SCHRIFT_SPEICHER)||"null"); }catch(e){ return; }
+  if(!s||!s.name||!s.url) return;
+  const ff=fontEintragen(s.name,s.url);
+  if(!ff){ try{ localStorage.removeItem(SCHRIFT_SPEICHER); }catch(e){} return; }
+  SCHRIFT_DATEI=s;
+  ff.load().catch(()=>{});
+}
 function fontUpload(){
   pickFile((d,n)=>{
     const name=(n||"Eigene").replace(/\.(ttf|otf|woff2?)$/i,"").trim()||"Eigene";
@@ -583,8 +626,12 @@ function fontUpload(){
       document.fonts.add(f);
       if(!SCHRIFTEN.some(x=>x.id===name))
         SCHRIFTEN.push({id:name,label:name+" · geladen",stack:'"'+name+'", system-ui, sans-serif'});
+      SCHRIFT_DATEI={name,url:d};
+      const bleibt=schriftDateiSichern();
       schriftListe(); schriftSetzen(name);
-      fontHinweis(name+" ist geladen und ausgewählt.");
+      fontHinweis(name+(bleibt?" ist geladen und ausgewählt."
+        :" ist geladen und ausgewählt. Die Datei ist zu groß zum Merken – nach dem Schließen musst du sie erneut laden."));
+      geaendert();
     }).catch(()=>fontHinweis("Diese Datei konnte nicht als Schrift gelesen werden. TTF, OTF oder WOFF2 versuchen."));
   }, ".ttf,.otf,.woff,.woff2");
 }
@@ -746,7 +793,7 @@ function formular(){
     const ta=d.querySelector("textarea");ta.value=r.text;
     ta.oninput=()=>{r.text=ta.value;paint(r);};box.appendChild(d);});
 }
-function daten(){return{name:g("vname").value,W,H,marke:MARKE.slice(),
+function daten(){return{name:g("vname").value,W,H,marke:MARKE.slice(),schrift:SCHRIFT,
   bg:{art:g("bgart").value,c:g("bg1").value,g1:g("gv1").value,g2:g("gv2").value,gw:g("gw").value,dk:g("dk").value,img:bgImg},
   els:els.map(({el,...r})=>r)};}
 async function saveVorlage(){const a=document.createElement("a");
@@ -761,6 +808,11 @@ function ladeDaten(d){
     else if(oo.includes(d.H+"x"+d.W)&&DRUCK[d.H+"x"+d.W]){g("format").value=d.H+"x"+d.W;if(g("quer"))g("quer").checked=true;}}
   setFormat();
   if(Array.isArray(d.marke)&&d.marke.length){MARKE=d.marke.slice();palette();}
+  // Schrift: gespeicherte Auswahl uebernehmen. Fehlt eine selbst geladene Schrift auf
+  // diesem Geraet, faellt schriftSetzen auf Poppins zurueck und sagt das auch.
+  {const w=d.schrift||"Poppins", da=SCHRIFTEN.some(x=>x.id===w);
+   schriftListe(); schriftSetzen(w);
+   fontHinweis(da?"":"Die Vorlage nutzt die Schrift „"+w+"“. Sie liegt nicht auf diesem Gerät – lade die Schriftdatei, dann sieht die Folie wieder aus wie gedacht.");}
   if(d.bg){g("bgart").value=d.bg.art||"farbe";if(d.bg.c)g("bg1").value=d.bg.c;
     if(d.bg.g1)g("gv1").value=d.bg.g1;if(d.bg.g2)g("gv2").value=d.bg.g2;
     if(d.bg.gw!=null)g("gw").value=d.bg.gw;if(d.bg.dk!=null)g("dk").value=d.bg.dk;
@@ -851,7 +903,98 @@ async function gitter(){
   for(let i=0;i<9;i++){const d=document.createElement("div");
     if(i===0)d.style.backgroundImage=`url(${url})`;box.appendChild(d);}
 }
-function pruefen(){ capPruef(); kontrast(); gitter(); }
+/* ---------- Bildaufloesung fuer den Druck ----------
+   Auf dem Bildschirm ist jede Aufloesung genug, im Druck nicht. Hier wird
+   ausgerechnet, wie viele echte Bildpunkte je Zoll von einem eingefuegten
+   Bild uebrig bleiben, wenn die Folie in der gewaehlten Groesse gedruckt
+   wird. Unter 150 dpi sieht man das Ergebnis, ab 300 dpi ist es sauber. */
+const BILD_MASSE = {};           // Adresse -> {w,h} der Datei, einmal gemessen
+function bildMasse(src){
+  return new Promise(res=>{
+    if(!src) return res(null);
+    if(BILD_MASSE[src]) return res(BILD_MASSE[src]);
+    const i=new Image();
+    i.onload=()=>{BILD_MASSE[src]={w:i.naturalWidth,h:i.naturalHeight};res(BILD_MASSE[src]);};
+    i.onerror=()=>res(null);
+    i.src=src;
+  });
+}
+// Wie viele Bildpunkte je Zoll hat die Folie selbst im gewaehlten Format?
+function folienDpi(){
+  const d=druckInfo(); if(!d||!d.b) return null;
+  return W/(d.b/25.4);
+}
+// Kleinere der beiden Achsen zaehlt: ein verzerrtes Bild ist so scharf wie
+// seine schwaechste Richtung.
+function bildDpi(masse, breitePx, hoehePx, fd){
+  if(!masse||!fd) return null;
+  const x=fd*masse.w/Math.max(breitePx,1), y=fd*masse.h/Math.max(hoehePx,1);
+  return Math.min(x,y);
+}
+function dpiUrteil(dpi, fd){
+  if(dpi>=Math.min(fd,300)-1) return ["ok","reicht"];
+  if(dpi>=150) return ["warn","knapp"];
+  return ["bad","zu wenig"];
+}
+async function bilderPruefen(){
+  const t=g("pBilder"); if(!t) return;
+  const hin=g("pBilderHin");
+  t.innerHTML="";
+  const fd=folienDpi();
+  if(!fd){
+    t.innerHTML='<tr><td class="hin">Nur bei Druckformaten von Bedeutung. '+
+      'Für Instagram spielt die Auflösung keine Rolle.</td></tr>';
+    if(hin) hin.style.display="none";
+    return;
+  }
+  if(hin) hin.style.display="";
+  const stuecke=[];
+  if(bgImg) stuecke.push({name:"Hintergrundbild", src:bgImg, deckend:true});
+  els.forEach(r=>{ if(r.t==="img"&&r.src) stuecke.push({name:r.name||"Bild", src:r.src, b:r.w, h:r.h}); });
+  if(!stuecke.length){
+    t.innerHTML='<tr><td class="hin">Diese Folie hat keine Bilder. Flächen, Kreise und '+
+      'Text werden in voller Auflösung gerechnet.</td></tr>';
+    return;
+  }
+  const zeilen=[];
+  for(const s of stuecke){
+    if(/^data:image\/svg\+xml/i.test(s.src)){
+      zeilen.push(['<td>'+esc(s.name)+
+        '<div class="hin" style="margin:0">SVG · wird beim Export neu gezeichnet</div></td>'+
+        '<td class="ok">immer scharf</td>']); continue; }
+    const m=await bildMasse(s.src);
+    if(!m){ zeilen.push(['<td>'+esc(s.name)+'</td><td class="warn">unbekannt</td>']); continue; }
+    // Der Hintergrund fuellt die Folie formatfuellend, wird also so weit
+    // vergroessert, bis beide Seiten gedeckt sind.
+    const dpi = s.deckend
+      ? fd*Math.min(m.w/W, m.h/H)
+      : bildDpi(m, s.b, s.h, fd);
+    const [kl,wort]=dpiUrteil(dpi, fd);
+    zeilen.push(['<td>'+esc(s.name)+
+      '<div class="hin" style="margin:0">'+m.w+' × '+m.h+' Pixel · '+wort+'</div></td>'+
+      '<td class="'+kl+'">'+Math.round(dpi)+' dpi</td>']);
+  }
+  t.innerHTML=zeilen.map(z=>'<tr>'+z[0]+'</tr>').join("");
+  const ziel=Math.round(Math.min(fd,300));
+  if(hin) hin.textContent="Die Folie selbst wird mit "+Math.round(fd)+" dpi gerechnet. "+
+    "Ziel für Bilder sind "+ziel+" dpi; unter 150 dpi wird es im Druck sichtbar unscharf.";
+}
+// Kurzfassung fuer die Statuszeile beim Druck-Export
+async function bilderWarnung(){
+  const fd=folienDpi(); if(!fd) return "";
+  const schwach=[];
+  const pruef=async(name,src,b,h,deckend)=>{
+    const m=await bildMasse(src); if(!m) return;
+    const dpi=deckend?fd*Math.min(m.w/W,m.h/H):bildDpi(m,b,h,fd);
+    if(dpi<150) schwach.push(name+" ("+Math.round(dpi)+" dpi)");
+  };
+  if(bgImg) await pruef("Hintergrundbild", bgImg, 0, 0, true);
+  for(const r of els) if(r.t==="img"&&r.src) await pruef(r.name||"Bild", r.src, r.w, r.h, false);
+  if(!schwach.length) return "";
+  return " Achtung, zu wenig Auflösung für den Druck: "+schwach.join(", ")+
+    ". Unter 150 dpi wird das sichtbar unscharf.";
+}
+function pruefen(){ capPruef(); kontrast(); gitter(); bilderPruefen(); }
 
 /* ---------- Ausgabe ---------- */
 async function bild(){
@@ -948,6 +1091,7 @@ const DRUCK={
   "3508x4967":{n:"A1",mm:[594,841]},
   "4967x7022":{n:"A0",mm:[841,1189]}};
 function querUm(){ setFormat(); if(window.innerWidth<=1100&&typeof autoZoom==="function")autoZoom();
+  if(typeof bilderPruefen==="function")bilderPruefen();
   if(typeof sichern==="function"){sichern();merke();} }
 function druckInfo(){const d=DRUCK[g("format").value];if(!d)return null;
   const q=g("quer")&&g("quer").checked;
@@ -1009,7 +1153,8 @@ async function exportPdf(){
     let cv;try{cv=await bild();}finally{window.__hochaufloesend=ha;}
     const blob=pdfBauen([jpegVon(cv)],d.b,d.h,g("beschnitt").checked);
     await pdfRunter(blob,(g("vname").value||"druck").replace(/[^\wäöüÄÖÜß _-]/g,"")+" "+d.n+".pdf");
-    if(st)st.textContent="Fertig. Das PDF ist druckfertig"+(g("beschnitt").checked?" und enthält 3 mm Beschnitt.":".");
+    const warnung=await bilderWarnung();
+    if(st)st.textContent="Fertig. Das PDF ist druckfertig"+(g("beschnitt").checked?" und enthält 3 mm Beschnitt.":".")+warnung;
   }catch(e){if(st)st.textContent="Das hat nicht geklappt: "+e.message;}
 }
 async function seriePdf(){
@@ -1031,7 +1176,7 @@ async function seriePdf(){
     }
     const blob=pdfBauen(seiten,d.b,d.h,g("beschnitt").checked);
     await pdfRunter(blob,(g("vname").value||"druck").replace(/[^\wäöüÄÖÜß _-]/g,"")+" "+d.n+" Serie.pdf");
-    st.textContent="Fertig, ein PDF mit "+bl.length+" Seiten.";
+    st.textContent="Fertig, ein PDF mit "+bl.length+" Seiten."+(await bilderWarnung());
   }catch(e){ st.textContent="Das hat nicht geklappt: "+(e.message||e); }
   finally{ window.__hochaufloesend=ha; tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular(); }
 }
@@ -1356,7 +1501,7 @@ function galerieZeigen(){
 
 
 window.__start=true;
-setFormat();bgPaint();schriftListe();schriftSetzen(SCHRIFT);if(!wiederherstellen())addText();select(null);lagen();setTimeout(merke,80);
+setFormat();bgPaint();schriftDateiHolen();schriftListe();schriftSetzen(SCHRIFT);if(!wiederherstellen())addText();select(null);lagen();setTimeout(merke,80);
 window.__start=false;
 if(window.innerWidth<=1100) autoZoom();
 let __t; window.addEventListener("resize", ()=>{ clearTimeout(__t);
