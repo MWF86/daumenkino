@@ -73,6 +73,16 @@ body.folie .el.sel .gr{display:block}
 #lagen b{color:var(--a);font-weight:600}
 .feld{border:1px solid #22303f;border-radius:8px;padding:9px 10px;margin-bottom:8px;background:#161f2b}
 .feld label{margin:0 0 4px;color:var(--a);font-weight:600;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+/* Serien-Bauer: je Folie eine Karte mit einem Feld je Textfeld */
+.sfolie{border:1px solid #22303f;border-radius:9px;padding:10px 11px 4px;margin-bottom:9px;background:#161f2b}
+.sfolie .feld{margin-bottom:7px}
+.sfoliekopf{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.sfoliekopf b{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#8a94a6}
+.sfoliekopf span{display:flex;gap:4px;flex:0 0 auto}
+button.sklein{width:26px;height:26px;padding:0;margin:0;flex:0 0 auto;font-size:12px;line-height:1;border-radius:7px}
+button.sklein:disabled{opacity:.32;cursor:default}
+select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
+.sfolie .leer{color:#c78b3c}
 .pruef{border:1px solid #22303f;border-radius:8px;padding:12px 13px;margin-bottom:11px;background:#161f2b}
 .pruef h3{font-size:12.5px;margin-bottom:8px}
 .ok{color:#57d38c}.warn{color:#ffc046}.bad{color:#ff6b6b}
@@ -224,10 +234,19 @@ body.folie .el.sel .gr{display:block}
     <label>Name</label><input type="text" id="vname" value="Meine Vorlage">
     <button class="p" style="margin-top:7px" onclick="saveVorlage()">Vorlage speichern</button>
     <button onclick="loadVorlage()">Vorlage laden</button>
-    <h2>Serientexte</h2>
-    <p class="hin" style="margin-top:0">Ein Block je Folie, Blöcke durch eine Leerzeile trennen. Innerhalb eines Blocks eine Zeile je Textfeld, Reihenfolge wie rechts.</p>
-    <textarea id="serie" rows="14"></textarea>
-    <button class="p" style="margin-top:7px" onclick="serieExport()">Serie als PNG laden</button>
+    <h2>Folien der Serie</h2>
+    <div id="sbauer"></div>
+    <button style="margin-top:7px" onclick="folieDazu()">＋ Folie hinzufügen</button>
+    <p class="hin" style="margin-top:6px" id="sbauerhin"></p>
+
+    <details id="sroh" style="margin-top:12px">
+      <summary style="cursor:pointer;font-size:12.5px;color:#8a94a6;padding:4px 0">Alle Texte als Block bearbeiten</summary>
+      <p class="hin" style="margin-top:4px">Ein Block je Folie, Blöcke durch eine Leerzeile trennen. Innerhalb eines
+      Blocks eine Zeile je Textfeld, Reihenfolge wie oben. Praktisch zum Einfügen aus einem anderen Programm.</p>
+      <textarea id="serie" rows="12"></textarea>
+    </details>
+
+    <button class="p" style="margin-top:9px" onclick="serieExport()">Serie als PNG laden</button>
     <button class="druckzeug" style="display:none" onclick="seriePdf()">Serie als Druck-PDF laden</button>
     <p class="hin" id="seriestatus"></p>
   </section>
@@ -416,8 +435,10 @@ body.folie .el.sel .gr{display:block}
     <h4>Serie</h4>
     <ol>
       <li>Gib jedem Textfeld links im Reiter Folie einen <b>Namen</b>, etwa Kicker oder Überschrift.</li>
+      <li>Im Reiter Serie auf <b>＋ Folie hinzufügen</b>. Für jedes benannte Textfeld erscheint ein Eingabefeld mit dem Namen daneben. Die Pfeile ordnen um, das ✕ entfernt.</li>
+      <li><b>Serie als PNG laden</b> fragt einmal nach einem Ordner und legt alle Folien dort ab.</li>
+      <li>In der <b>Galerie</b> lassen sich mehrere gespeicherte Vorlagen ankreuzen – daraus wird ein Karussell mit verschieden gestalteten Folien.</li>
       <li><b>Vorlage speichern</b> legt eine kleine Datei an, die du wiederverwenden und weitergeben kannst.</li>
-      <li>Links alle Folien untereinander eintragen, ein Block je Folie, dann <b>Serie als PNG laden</b>.</li>
     </ol>
     <h4>Prüfen</h4>
     <ul>
@@ -521,7 +542,7 @@ function tab(t){
   document.querySelectorAll("aside#links .seite").forEach(s=>s.style.display=s.classList.contains(t)?"":"none");
   [...g("reiter").children].forEach((b,i)=>b.classList.toggle("on", ["folie","serie","pruefen"][i]===t));
   ["folie","serie","pruefen"].forEach(x=>g("s_"+x).classList.toggle("on", x===t));
-  if(t==="serie"){ select(null); formular(); }
+  if(t==="serie"){ select(null); formular(); bauer(); }
   if(t==="pruefen"){ select(null); pruefen(); }
 }
 
@@ -793,6 +814,160 @@ function formular(){
     const ta=d.querySelector("textarea");ta.value=r.text;
     ta.oninput=()=>{r.text=ta.value;paint(r);};box.appendChild(d);});
 }
+/* ---------- Serien-Bauer ----------
+   Eine Serie ist eine Liste von Folien. Die Texte stehen weiterhin im Kasten
+   #serie, ein Block je Folie - damit bleiben Einfuegen aus anderen Programmen,
+   die Autosicherung und die Schnittstelle unveraendert. Der Bauer ist eine
+   zweite Sicht auf denselben Kasten: ein Eingabefeld je Textfeld, mit dem
+   Feldnamen als Beschriftung.
+   Daneben steht SERIE_TPL: je Folie entweder null (Aussehen der aktuellen
+   Folie) oder {galerie:"Name"} - dann holt sich diese Folie ihr Aussehen aus
+   der Galerie. So lassen sich verschieden gestaltete Folien zu einem
+   Karussell mischen. Gespeichert wird nur der Name, nicht die Vorlage selbst,
+   damit der Rueckgaengig-Puffer klein bleibt. */
+let SERIE_TPL=[];
+
+function serieRoh(){
+  const t=g("serie").value;
+  return t.trim()===""?[]:t.split(/\n\s*\n/).map(b=>b.split("\n"));
+}
+/* Wie viele Folien die Serie hat. Leere Folien lassen sich im Textkasten nicht
+   darstellen - zwei Leerzeilen hintereinander sind keine leere Folie, sondern
+   nur ein Trenner. Deshalb fuehrt SERIE_TPL die Zahl mit: ein Eintrag je Folie,
+   null heisst "Aussehen dieser Folie". Beides steht in der Autosicherung. */
+function serieAnzahl(){ return Math.max(serieRoh().length, SERIE_TPL.length); }
+function serieAusrichten(){
+  while(SERIE_TPL.length<serieRoh().length) SERIE_TPL.push(null);
+}
+function serieSchreiben(bl){
+  const n=Math.max(bl.length,SERIE_TPL.length);
+  while(bl.length<n) bl.push([]);
+  while(SERIE_TPL.length<n) SERIE_TPL.push(null);
+  g("serie").value=bl.map(b=>b.join("\n")).join("\n\n");
+  geaendert();
+}
+// Die Folien, die wirklich ausgegeben werden: leere fallen weg, die
+// Vorlagenzuordnung wandert mit, damit die Nummern nicht verrutschen.
+function serienFolien(){
+  const bl=serieRoh(), aus=[];
+  for(let i=0;i<serieAnzahl();i++){
+    const z=bl[i]||[];
+    if(z.join("").trim()) aus.push({zeilen:z,tpl:SERIE_TPL[i]||null});
+  }
+  return aus;
+}
+function galerieVorlage(name){return eigeneVorlagen().find(x=>x.name===name)||null;}
+function felderVon(d){return (d.els||[]).filter(o=>o.t==="text"&&!o.alle&&!o.auto);}
+// Feldnamen der Vorlage, die fuer Folie i gilt. null = Vorlage fehlt.
+function serieFelder(i){
+  const t=SERIE_TPL[i];
+  if(t&&t.galerie){
+    const v=galerieVorlage(t.galerie);
+    return v&&v.daten?felderVon(v.daten).map(o=>o.name||"Text"):null;
+  }
+  return textfelder().map(r=>r.name||"Text");
+}
+function folieDazu(){
+  serieAusrichten(); SERIE_TPL.push(null);
+  geaendert(); bauer();
+  // Gleich ins erste Feld der neuen Folie springen
+  const k=g("sbauer").querySelectorAll(".sfolie");
+  const ta=k.length?k[k.length-1].querySelector("textarea"):null;
+  if(ta) ta.focus();
+}
+function folieWeg(i){
+  const bl=serieRoh(); serieAusrichten();
+  const n=serieAnzahl();
+  while(bl.length<n) bl.push([]);
+  bl.splice(i,1); SERIE_TPL.splice(i,1);
+  serieSchreiben(bl); bauer();
+}
+function folieSchieben(i,d){
+  const j=i+d;
+  if(j<0||j>=serieAnzahl()) return;
+  const bl=serieRoh(); serieAusrichten();
+  const n=serieAnzahl();
+  while(bl.length<n) bl.push([]);
+  [bl[i],bl[j]]=[bl[j],bl[i]];
+  const a=SERIE_TPL[i]||null, b=SERIE_TPL[j]||null;
+  SERIE_TPL[i]=b; SERIE_TPL[j]=a;
+  serieSchreiben(bl); bauer();
+}
+function bauer(){
+  const box=g("sbauer"); if(!box) return;
+  serieAusrichten();
+  const roh=serieRoh(), gal=eigeneVorlagen(), anzahl=serieAnzahl();
+  const bl=[]; for(let i=0;i<anzahl;i++) bl.push(roh[i]||[]);
+  box.innerHTML="";
+  if(!bl.length){
+    const p=document.createElement("p"); p.className="hin"; p.style.marginTop="0";
+    p.textContent="Noch keine Folie. „＋ Folie hinzufügen“ legt die erste an – sie bekommt das Aussehen deiner aktuellen Folie und für jedes benannte Textfeld ein Eingabefeld.";
+    box.appendChild(p); leerHinweis(0); return;
+  }
+  bl.forEach((zeilen,i)=>{
+    const karte=document.createElement("div"); karte.className="sfolie";
+    const kopf=document.createElement("div"); kopf.className="sfoliekopf";
+    const t=document.createElement("b"); t.textContent="Folie "+(i+1); kopf.appendChild(t);
+    const kn=document.createElement("span");
+    [["↑","nach oben",()=>folieSchieben(i,-1),i===0],
+     ["↓","nach unten",()=>folieSchieben(i,1),i===bl.length-1],
+     ["✕","entfernen",()=>folieWeg(i),false]].forEach(([z,titel,f,aus])=>{
+      const b=document.createElement("button"); b.type="button"; b.className="s sklein";
+      b.textContent=z; b.title=titel; b.disabled=aus; b.onclick=f; kn.appendChild(b);});
+    kopf.appendChild(kn); karte.appendChild(kopf);
+
+    if(gal.length){
+      const w=document.createElement("select"); w.className="svorlage";
+      const o0=document.createElement("option"); o0.value=""; o0.textContent="Aussehen: diese Folie";
+      w.appendChild(o0);
+      gal.forEach(v=>{const o=document.createElement("option");o.value=v.name;
+        o.textContent="Aussehen: "+v.name;w.appendChild(o);});
+      const s=SERIE_TPL[i];
+      if(s&&s.galerie&&!gal.some(v=>v.name===s.galerie)){
+        const o=document.createElement("option");o.value=s.galerie;
+        o.textContent="Fehlt: "+s.galerie;w.appendChild(o);}
+      w.value=s&&s.galerie?s.galerie:"";
+      w.onchange=()=>{SERIE_TPL[i]=w.value?{galerie:w.value}:null;geaendert();bauer();};
+      karte.appendChild(w);
+    }
+
+    const namen=serieFelder(i);
+    if(namen===null){
+      const p=document.createElement("p"); p.className="hin leer";
+      p.textContent="Die Vorlage „"+SERIE_TPL[i].galerie+"“ liegt nicht mehr in der Galerie. Wähle oben eine andere.";
+      karte.appendChild(p);
+    }else if(!namen.length){
+      const p=document.createElement("p"); p.className="hin leer";
+      p.textContent="Diese Vorlage hat keine benannten Textfelder. Im Reiter Folie jedem Textfeld einen Feldnamen geben.";
+      karte.appendChild(p);
+    }else{
+      namen.forEach((n,k)=>{
+        const f=document.createElement("div"); f.className="feld";
+        const l=document.createElement("label"); l.textContent=n;
+        const ta=document.createElement("textarea"); ta.rows=2; ta.value=zeilen[k]??"";
+        ta.oninput=()=>{
+          const b2=serieRoh(), m=serieAnzahl();
+          while(b2.length<m) b2.push([]);
+          while(b2[i].length<namen.length) b2[i].push("");
+          b2[i][k]=ta.value.replace(/\s*\n\s*/g," ");   // Zeilenumbrueche wuerden den Block sprengen
+          serieSchreiben(b2);
+          leerHinweis(serienFolien().length);
+        };
+        f.appendChild(l); f.appendChild(ta); karte.appendChild(f);});
+      if(!zeilen.join("").trim()){
+        const p=document.createElement("p"); p.className="hin leer";
+        p.textContent="Ohne Text wird diese Folie nicht ausgegeben.";
+        karte.appendChild(p);}
+    }
+    box.appendChild(karte);
+  });
+  leerHinweis(serienFolien().length);
+}
+function leerHinweis(n){
+  const h=g("sbauerhin"); if(!h) return;
+  h.textContent=n?(n===1?"1 Folie":n+" Folien")+" werden ausgegeben.":"";
+}
+
 function daten(){return{name:g("vname").value,W,H,marke:MARKE.slice(),schrift:SCHRIFT,
   bg:{art:g("bgart").value,c:g("bg1").value,g1:g("gv1").value,g2:g("gv2").value,gw:g("gw").value,dk:g("dk").value,img:bgImg},
   els:els.map(({el,...r})=>r)};}
@@ -821,7 +996,9 @@ function ladeDaten(d){
   (d.els||[]).forEach(o=>{const r=mk(o.t,{...o});paint(r);});select(null);lagen();
   if(reiter==="serie")formular();
 }
-function loadVorlage(){pickFile(txt=>ladeDaten(JSON.parse(txt)),".json",true);}
+// ladeDaten selbst zeichnet den Bauer nicht neu - es laeuft auch im Serien-Export
+// je Folie durch. Wer von Hand eine Vorlage laedt, bekommt ihn hier aufgefrischt.
+function loadVorlage(){pickFile(txt=>{ladeDaten(JSON.parse(txt));bauer();},".json",true);}
 function neu(){els.forEach(r=>r.el.remove());els=[];select(null);lagen();}
 
 /* ---------- Prüfen ---------- */
@@ -1020,42 +1197,125 @@ async function exportPng(){
     const a=document.createElement("a");a.download=name;a.href=url;a.click();
   }catch(e){ alert("Speichern oder Teilen hat nicht geklappt: "+(e.message||e)); }
 }
-async function serieExport(){
+/* ---------- ZIP ohne Fremdbibliothek ----------
+   Frueher lud die Serie im Browser jede Folie einzeln herunter. Edge, Opera und
+   Chrome fragen dann "Mehrere Dateien herunterladen?" - wird das weggeklickt,
+   fehlen die restlichen Folien stillschweigend und die Seite steht danach auf
+   "Downloads blockiert", womit auch das einzelne PNG nicht mehr geht.
+   Deshalb gibt es jetzt genau eine Datei: entweder direkt in einen gewaehlten
+   Ordner geschrieben, oder als ZIP. Verdichtet wird nicht - PNG ist bereits
+   verdichtet, und so bleibt der Schreiber kurz und nachvollziehbar. */
+function crc32(u8){
+  let t=crc32.tafel;
+  if(!t){ t=crc32.tafel=new Uint32Array(256);
+    for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;} }
+  let x=0xFFFFFFFF;
+  for(let i=0;i<u8.length;i++) x=(x>>>8)^t[(x^u8[i])&0xFF];
+  return (x^0xFFFFFFFF)>>>0;
+}
+function zipBauen(dateien){
+  const enc=new TextEncoder(), teile=[], zentral=[];
+  let versatz=0, zsize=0;
+  dateien.forEach(f=>{
+    const name=enc.encode(f.name), crc=crc32(f.daten), len=f.daten.length;
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0,true);
+    lh.setUint16(8,0,true); lh.setUint16(10,0,true); lh.setUint16(12,0x21,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,len,true); lh.setUint32(22,len,true);
+    lh.setUint16(26,name.length,true); lh.setUint16(28,0,true);
+    teile.push(new Uint8Array(lh.buffer),name,f.daten);
+    const cd=new DataView(new ArrayBuffer(46));
+    cd.setUint32(0,0x02014b50,true); cd.setUint16(4,20,true); cd.setUint16(6,20,true);
+    cd.setUint16(8,0,true); cd.setUint16(10,0,true); cd.setUint16(12,0,true); cd.setUint16(14,0x21,true);
+    cd.setUint32(16,crc,true); cd.setUint32(20,len,true); cd.setUint32(24,len,true);
+    cd.setUint16(28,name.length,true); cd.setUint16(30,0,true); cd.setUint16(32,0,true);
+    cd.setUint16(34,0,true); cd.setUint16(36,0,true); cd.setUint32(38,0,true);
+    cd.setUint32(42,versatz,true);
+    zentral.push(new Uint8Array(cd.buffer),name);
+    versatz+=30+name.length+len; zsize+=46+name.length;
+  });
+  const e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true); e.setUint16(4,0,true); e.setUint16(6,0,true);
+  e.setUint16(8,dateien.length,true); e.setUint16(10,dateien.length,true);
+  e.setUint32(12,zsize,true); e.setUint32(16,versatz,true); e.setUint16(20,0,true);
+  return new Blob([...teile,...zentral,new Uint8Array(e.buffer)],{type:"application/zip"});
+}
+async function pngVon(cv){
+  const b=await new Promise(r=>cv.toBlob(r,"image/png"));
+  return new Uint8Array(await b.arrayBuffer());
+}
+function serieName(){return (g("vname").value||"Serie").replace(/[^\wäöüÄÖÜß _-]/g,"").trim()||"Serie";}
+
+/* Stellt die Buehne fuer eine Folie der Serie her. `buehne` merkt sich, welche
+   Vorlage gerade geladen ist, damit bei gleicher Vorlage nicht jedes Mal neu
+   aufgebaut wird. Gibt einen Hinweistext zurueck, wenn etwas fehlte. */
+function folieHerstellen(f,i,n,schnappschuss,buehne){
+  let warnung="";
+  const will=f.tpl&&f.tpl.galerie?f.tpl.galerie:null;
+  if(will!==buehne.name){
+    const v=will?galerieVorlage(will):null;
+    if(will&&v&&v.daten){ ladeDaten(v.daten); buehne.name=will; }
+    else{
+      if(buehne.name!==null){ ladeDaten(schnappschuss); buehne.name=null; }
+      if(will) warnung="Folie "+(i+1)+": die Vorlage „"+will+"“ liegt nicht mehr in der Galerie, sie bekommt das aktuelle Aussehen.";
+    }
+  }
   const tf=textfelder();
-  if(!tf.length){g("seriestatus").textContent="Diese Vorlage hat keine Textfelder.";return;}
-  const bl=g("serie").value.split(/\n\s*\n/).map(b=>b.split("\n")).filter(b=>b.join("").trim());
-  if(!bl.length){g("seriestatus").textContent="Keine Blöcke gefunden.";return;}
-  // Im Programm einmal nach dem Ordner fragen, dann alles am Stück hineinschreiben.
-  // Im Browser bleibt es beim Download je Folie.
-  let ordner=null;
+  tf.forEach((r,k)=>{r.text=(f.zeilen[k]??"").trim();paint(r);});
+  autofelder().forEach(r=>{r.text=String(i+1).padStart(2,"0")+" / "+String(n).padStart(2,"0");paint(r);});
+  return warnung;
+}
+
+async function serieExport(){
+  const st=g("seriestatus");
+  const folien=serienFolien();
+  if(!folien.length){st.textContent="Keine Folie mit Text. Trage oben mindestens eine ein.";return;}
+
+  // Ziel klaeren, solange der Klick des Nutzers noch "frisch" ist.
+  let ordner=null, verz=null;
   if(window.daumenkino){
     ordner=await window.daumenkino.ordnerWaehlen();
-    if(!ordner){g("seriestatus").textContent="Abgebrochen.";return;}
+    if(!ordner){st.textContent="Abgebrochen.";return;}
+  }else if(!inStoreApp()&&window.showDirectoryPicker){
+    try{ verz=await window.showDirectoryPicker({mode:"readwrite",id:"daumenkino-serie"}); }
+    catch(e){
+      // Abbruch durch den Nutzer heisst Abbruch. Verweigert der Browser die
+      // Ordnerwahl dagegen (eingebettetes Fenster, Richtlinie), gibt es die ZIP.
+      if(e&&e.name==="AbortError"){ st.textContent="Abgebrochen."; return; }
+      verz=null;
+    }
   }
-  const sicher=tf.map(r=>r.text);
-  window.__serieStapel=null;   // Reste eines frueheren Abbruchs verwerfen
+
+  const schnappschuss=daten(), warRuhig=__ruhig, buehne={name:null};
+  __ruhig=true;
+  const stapel=[]; const warnungen=[];
   try{
-    for(let i=0;i<bl.length;i++){
-      tf.forEach((r,k)=>{r.text=(bl[i][k]??"").trim();paint(r);});
-      autofelder().forEach(r=>{r.text=String(i+1).padStart(2,"0")+" / "+String(bl.length).padStart(2,"0");paint(r);});
-      formular();
-      g("seriestatus").textContent=`Folie ${i+1} von ${bl.length} …`;
-      const cv=await bild(); const name=String(i+1).padStart(2,"0")+".png"; const url=cv.toDataURL("image/png");
-      if(ordner){ await window.daumenkino.inOrdner(ordner,name,url); }
-      else if(inStoreApp()){ (window.__serieStapel=window.__serieStapel||[]).push([name,url]); }
-      else{ const a=document.createElement("a");a.download=name;a.href=url;a.click();
-            await new Promise(r=>setTimeout(r,420)); }
+    for(let i=0;i<folien.length;i++){
+      st.textContent=`Folie ${i+1} von ${folien.length} …`;
+      const fehlt=folieHerstellen(folien[i],i,folien.length,schnappschuss,buehne);
+      if(fehlt) warnungen.push(fehlt);
+      const name=String(i+1).padStart(2,"0")+".png";
+      const cv=await bild();
+      if(ordner){ await window.daumenkino.inOrdner(ordner,name,cv.toDataURL("image/png")); }
+      else if(verz){ const fh=await verz.getFileHandle(name,{create:true});
+                     const w=await fh.createWritable(); await w.write(await pngVon(cv)); await w.close(); }
+      else if(inStoreApp()){ stapel.push([name,cv.toDataURL("image/png")]); }
+      else{ stapel.push([name,await pngVon(cv)]); }
     }
-    if(!ordner&&inStoreApp()&&window.__serieStapel){
-      const st=window.__serieStapel;window.__serieStapel=null;
-      g("seriestatus").textContent="Teilen-Blatt öffnet sich …";
-      await storeTeilen(st.map(x=>x[0]),st.map(x=>x[1]));
-    }
-    if(ordner){ g("seriestatus").textContent=`Fertig, ${bl.length} Folien liegen im gewählten Ordner.`;
+    const rest=warnungen.length?" "+warnungen.join(" "):"";
+    if(ordner){ st.textContent=`Fertig, ${folien.length} Folien liegen im gewählten Ordner.`+rest;
                 window.daumenkino.ordnerOeffnen(ordner); }
-    else g("seriestatus").textContent=`Fertig, ${bl.length} Folien geladen.`;
-  }catch(e){ g("seriestatus").textContent="Das hat nicht geklappt: "+(e.message||e); window.__serieStapel=null; }
-  finally{ tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular(); }
+    else if(verz){ st.textContent=`Fertig, ${folien.length} Folien liegen im gewählten Ordner.`+rest; }
+    else if(inStoreApp()){ st.textContent="Teilen-Blatt öffnet sich …";
+                await storeTeilen(stapel.map(x=>x[0]),stapel.map(x=>x[1]));
+                st.textContent=`Fertig, ${folien.length} Folien geteilt.`+rest; }
+    else{ const blob=zipBauen(stapel.map(([n,d])=>({name:n,daten:d})));
+          const a=document.createElement("a"); a.download=serieName()+".zip";
+          a.href=URL.createObjectURL(blob); a.click();
+          setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+          st.textContent=`Fertig, ${folien.length} Folien in einer ZIP-Datei. Doppelklick darauf entpackt sie.`+rest; }
+  }catch(e){ st.textContent="Das hat nicht geklappt: "+(e.message||e); }
+  finally{ try{ladeDaten(schnappschuss);}catch(e){} __ruhig=warRuhig; formular(); bauer(); }
 }
 
 /* ---------- Store-App (iOS): natives Teilen-Blatt ----------
@@ -1160,25 +1420,35 @@ async function exportPdf(){
 async function seriePdf(){
   const d=druckInfo();const st=g("seriestatus");
   if(!d){st.textContent="Erst im Reiter Folie ein Druckformat wählen.";return;}
-  const tf=textfelder();
-  if(!tf.length){st.textContent="Diese Vorlage hat keine Textfelder.";return;}
-  const bl=g("serie").value.split(/\n\s*\n/).map(b=>b.split("\n")).filter(b=>b.join("").trim());
-  if(!bl.length){st.textContent="Keine Blöcke gefunden.";return;}
-  const sicher=tf.map(r=>r.text),seiten=[];
+  const folien=serienFolien();
+  if(!folien.length){st.textContent="Keine Folie mit Text. Trage oben mindestens eine ein.";return;}
+  // Ein PDF hat ein Seitenformat. Vorlagen mit abweichender Groesse wuerden
+  // verzerrt oder beschnitten - lieber vorher sagen als hinterher drucken.
+  for(const f of folien){
+    if(!f.tpl||!f.tpl.galerie) continue;
+    const v=galerieVorlage(f.tpl.galerie);
+    if(v&&v.daten&&(v.daten.W!==W||v.daten.H!==H)){
+      st.textContent="Die Vorlage „"+f.tpl.galerie+"“ hat ein anderes Format ("+v.daten.W+"×"+v.daten.H+
+        ") als diese Folie ("+W+"×"+H+"). Für ein Druck-PDF müssen alle Folien dasselbe Format haben.";
+      return;}
+  }
+  const schnappschuss=daten(), warRuhig=__ruhig, buehne={name:null};
+  const seiten=[], warnungen=[];
   const ha=window.__hochaufloesend;window.__hochaufloesend=false;   // Druck rechnet schon in Druckaufloesung
+  __ruhig=true;
   try{
-    for(let i=0;i<bl.length;i++){
-      tf.forEach((r,k)=>{r.text=(bl[i][k]??"").trim();paint(r);});
-      autofelder().forEach(r=>{r.text=String(i+1).padStart(2,"0")+" / "+String(bl.length).padStart(2,"0");paint(r);});
-      formular();
-      st.textContent="Seite "+(i+1)+" von "+bl.length+" …";
+    for(let i=0;i<folien.length;i++){
+      st.textContent="Seite "+(i+1)+" von "+folien.length+" …";
+      const fehlt=folieHerstellen(folien[i],i,folien.length,schnappschuss,buehne);
+      if(fehlt) warnungen.push(fehlt);
       seiten.push(jpegVon(await bild()));
     }
     const blob=pdfBauen(seiten,d.b,d.h,g("beschnitt").checked);
     await pdfRunter(blob,(g("vname").value||"druck").replace(/[^\wäöüÄÖÜß _-]/g,"")+" "+d.n+" Serie.pdf");
-    st.textContent="Fertig, ein PDF mit "+bl.length+" Seiten."+(await bilderWarnung());
+    st.textContent="Fertig, ein PDF mit "+folien.length+" Seiten."+(await bilderWarnung())+
+      (warnungen.length?" "+warnungen.join(" "):"");
   }catch(e){ st.textContent="Das hat nicht geklappt: "+(e.message||e); }
-  finally{ window.__hochaufloesend=ha; tf.forEach((r,k)=>{r.text=sicher[k];paint(r);});formular(); }
+  finally{ window.__hochaufloesend=ha; try{ladeDaten(schnappschuss);}catch(e){} __ruhig=warRuhig; formular(); bauer(); }
 }
 
 /* ---------- Schnittstelle für KI-Agenten und Einbettung ----------
@@ -1258,9 +1528,12 @@ window.addEventListener("message",async e=>{
    doppelte Exportaufloesung. */
 const SICHERUNG="daumenkino.autosicherung";
 let __ruhig=false,__puffer=[],__zeiger=-1,__g;
-function stand(){return {v:1,projekt:daten(),serie:g("serie").value,caption:g("caption").value};}
+function stand(){return {v:1,projekt:daten(),serie:g("serie").value,caption:g("caption").value,
+  serieTpl:SERIE_TPL.map(t=>t&&t.galerie?{galerie:t.galerie}:null)};}
 function anwenden(s){__ruhig=true;
-  try{ladeDaten(s.projekt);g("serie").value=s.serie||"";g("caption").value=s.caption||"";capPruef();}
+  try{ladeDaten(s.projekt);g("serie").value=s.serie||"";g("caption").value=s.caption||"";
+    SERIE_TPL=Array.isArray(s.serieTpl)?s.serieTpl.map(t=>t&&t.galerie?{galerie:t.galerie}:null):[];
+    capPruef();bauer();}
   finally{__ruhig=false;}}
 function sichern(){
   try{localStorage.setItem(SICHERUNG,JSON.stringify(stand()));}
@@ -1288,6 +1561,8 @@ const __lagen=lagen;lagen=function(){__lagen();geaendert();};
 const __bgPaint=bgPaint;bgPaint=function(){__bgPaint();geaendert();};
 const __palette=palette;palette=function(){__palette();geaendert();};
 ["serie","caption","vname"].forEach(id=>{const e=g(id);if(e)e.addEventListener("input",geaendert);});
+// Wer den Textkasten von Hand bearbeitet, soll das oben sofort sehen.
+(()=>{const e=g("serie");if(e)e.addEventListener("change",()=>bauer());})();
 document.addEventListener("keydown",e=>{
   if(!(e.metaKey||e.ctrlKey)||e.key.toLowerCase()!=="z")return;
   if(/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;
@@ -1418,7 +1693,9 @@ function galerieZeigen(){
   d.style.cssText="position:fixed;inset:0;background:rgba(5,10,18,.72);display:flex;align-items:center;justify-content:center;z-index:60;padding:18px";
   const k=document.createElement("div");
   k.style.cssText="background:#141a24;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:22px;max-width:560px;width:100%;max-height:85vh;overflow:auto";
-  k.innerHTML='<b style="font-size:17px">Vorlagen-Galerie</b><p style="font-size:13.5px;color:#8a94a6;margin:6px 0 14px">Ein Klick ersetzt die aktuelle Folie.</p>';
+  k.innerHTML='<b style="font-size:17px">Vorlagen-Galerie</b><p style="font-size:13.5px;color:#8a94a6;margin:6px 0 14px">'
+    +'Ein Klick auf das Bild ersetzt die aktuelle Folie. <b style="color:#2fd0bd">Serie</b> macht gleich im Reiter Serie weiter. '
+    +'Zum Zusammenstellen mehrerer Vorlagen zu einem Karussell die Kästchen oben links ankreuzen.</p>';
   const eigene=eigeneVorlagen();
   if(eigene.length){
     const ue=document.createElement("p");ue.textContent="Meine Vorlagen";
@@ -1426,18 +1703,52 @@ function galerieZeigen(){
     k.appendChild(ue);
     const raster=document.createElement("div");
     raster.style.cssText="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:16px";
+    const gewaehlt=new Set();
+    let fussKnopf=null;
+    const fussStand=()=>{if(!fussKnopf)return;
+      fussKnopf.disabled=gewaehlt.size===0;
+      fussKnopf.textContent=gewaehlt.size>1?"Serie aus "+gewaehlt.size+" Vorlagen bauen"
+        :gewaehlt.size===1?"Serie aus 1 Vorlage bauen":"Zum Zusammenstellen oben ankreuzen";};
     eigene.forEach((v,i)=>{
       const z=document.createElement("div");z.style.cssText="position:relative";
       const b=document.createElement("button");b.type="button";b.title=v.name;
       b.style.cssText="display:block;width:100%;padding:0;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);cursor:pointer;overflow:hidden;font:inherit;color:#e7ecf3";
       b.innerHTML='<img src="'+v.bild+'" alt="" style="display:block;width:100%;height:auto">'
         +'<span style="display:block;font-size:11.5px;padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+v.name.replace(/[<>&]/g,"")+"</span>";
-      b.onclick=()=>{ladeDaten(v.daten);d.remove();sichern();merke();if(reiter==="serie")formular();};
+      b.onclick=()=>{ladeDaten(v.daten);d.remove();sichern();merke();if(reiter==="serie"){formular();bauer();}};
       const wx=document.createElement("button");wx.type="button";wx.textContent="✕";wx.title="Aus der Galerie entfernen";
       wx.style.cssText="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:6px;border:0;background:rgba(5,10,18,.72);color:#cbd5e1;cursor:pointer;font-size:11px;line-height:1";
       wx.onclick=e=>{e.stopPropagation();vorlageWeg(i);};
-      z.appendChild(b);z.appendChild(wx);raster.appendChild(z);});
+      // Diese Vorlage laden und gleich eine Serie damit anfangen
+      const sr=document.createElement("button");sr.type="button";sr.textContent="Serie";
+      sr.title="Diese Vorlage laden und im Reiter Serie damit weitermachen";
+      sr.style.cssText="position:absolute;bottom:26px;right:4px;padding:2px 7px;border-radius:6px;border:0;background:rgba(5,10,18,.78);color:#2fd0bd;cursor:pointer;font-size:10.5px;line-height:1.6;font-weight:600";
+      sr.onclick=e=>{e.stopPropagation();
+        ladeDaten(v.daten);d.remove();
+        SERIE_TPL=[]; if(!serieRoh().length) folieDazu();
+        sichern();merke();tab("serie");bauer();};
+      // Ankreuzen, um mehrere Vorlagen zu einem Karussell zusammenzustellen
+      const ak=document.createElement("input");ak.type="checkbox";ak.title="Für eine Serie aus mehreren Vorlagen auswählen";
+      ak.style.cssText="position:absolute;top:6px;left:6px;width:16px;height:16px;margin:0;cursor:pointer;accent-color:#2fd0bd";
+      ak.onclick=e=>{e.stopPropagation();
+        if(ak.checked)gewaehlt.add(v.name);else gewaehlt.delete(v.name);fussStand();};
+      z.appendChild(b);z.appendChild(wx);z.appendChild(sr);z.appendChild(ak);raster.appendChild(z);});
     k.appendChild(raster);
+    fussKnopf=document.createElement("button");fussKnopf.type="button";fussKnopf.className="p";
+    fussKnopf.style.cssText="width:100%;margin:-8px 0 16px";
+    fussKnopf.onclick=()=>{
+      const namen=eigene.filter(v=>gewaehlt.has(v.name)).map(v=>v.name);   // Reihenfolge der Galerie
+      if(!namen.length)return;
+      const bl=[],tpl=[];
+      namen.forEach(n=>{const v=galerieVorlage(n);
+        bl.push(felderVon(v.daten).map(o=>o.text||""));   // Texte der Vorlage als Anfang
+        tpl.push({galerie:n});});
+      ladeDaten(galerieVorlage(namen[0]).daten);
+      SERIE_TPL=tpl; serieSchreiben(bl);
+      d.remove();sichern();merke();tab("serie");bauer();
+    };
+    fussStand();
+    k.appendChild(fussKnopf);
   }else{
     const hin=document.createElement("p");
     hin.textContent="Noch keine eigenen Vorlagen. Gestalte eine Folie und sichere sie im Reiter Serie mit „Vorlage speichern“ – dann erscheint sie hier mit Vorschaubild.";
@@ -1450,7 +1761,7 @@ function galerieZeigen(){
     const b=document.createElement("button");b.type="button";
     b.style.cssText="display:block;width:100%;text-align:left;margin-bottom:8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#e7ecf3;cursor:pointer;font:inherit";
     b.innerHTML="<b>"+v.name+"</b><br><span style='font-size:12.5px;color:#8a94a6'>"+v.hinweis+"</span>";
-    b.onclick=()=>{ladeDaten(v.daten);d.remove();sichern();merke();if(reiter==="serie")formular();};
+    b.onclick=()=>{ladeDaten(v.daten);d.remove();sichern();merke();if(reiter==="serie"){formular();bauer();}};
     k.appendChild(b);});
   const zu=document.createElement("button");zu.type="button";zu.textContent="Schließen";
   zu.style.cssText="margin-top:6px;padding:10px 14px;border-radius:10px;border:0;background:rgba(255,255,255,.1);color:#cbd5e1;cursor:pointer;font:inherit";
@@ -1501,7 +1812,7 @@ function galerieZeigen(){
 
 
 window.__start=true;
-setFormat();bgPaint();schriftDateiHolen();schriftListe();schriftSetzen(SCHRIFT);if(!wiederherstellen())addText();select(null);lagen();setTimeout(merke,80);
+setFormat();bgPaint();schriftDateiHolen();schriftListe();schriftSetzen(SCHRIFT);if(!wiederherstellen())addText();select(null);lagen();bauer();setTimeout(merke,80);
 window.__start=false;
 if(window.innerWidth<=1100) autoZoom();
 let __t; window.addEventListener("resize", ()=>{ clearTimeout(__t);
