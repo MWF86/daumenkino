@@ -1,7 +1,7 @@
 Daumenkino als Programm bauen
 =============================
 
-Es gibt zwei Fassungen aus einer Quelle: fdp und neutral. Sie unterscheiden
+Es gibt eine Fassung. Sie unterscheidet
 sich in Farbvorgabe, Symbol und Impressum, sonst in nichts.
 
 
@@ -16,15 +16,12 @@ Einmalig vorbereiten
 Ausprobieren, ohne zu bauen
 ---------------------------
       npm start           neutrale Fassung
-      npm run start:fdp   interne Fassung
 
 
 Bauen
 -----
       npm run bau:mac         macOS, neutral
-      npm run bau:mac:fdp     macOS, intern
       npm run bau:win         Windows, neutral
-      npm run bau:win:fdp     Windows, intern
 
 Das Ergebnis liegt danach im Ordner fertig.
 
@@ -88,7 +85,6 @@ Die Anwendung selbst aendern
 ----------------------------
 Nicht in quelle/ arbeiten. Die beiden Dateien dort sind Kopien aus
 
-      ../Quelle/Daumenkino_FDP.html
       ../Quelle/Daumenkino_Neutral.html
 
 Dort aendern, dann im Ordner SoMe/App einmal

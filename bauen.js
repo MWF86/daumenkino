@@ -14,8 +14,6 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const FASSUNGEN = {
-  fdp: { name: "Daumenkino FDP", variante: "fdp", appId: "de.moritzfingerle.daumenkino.fdp",
-         kanal: "fdp", html: "quelle/fdp.html", icons: "quelle/icons-fdp" },
   neutral: { name: "Daumenkino", variante: "neutral", appId: "de.moritzfingerle.daumenkino",
              kanal: "latest", html: "quelle/neutral.html", icons: "quelle/icons-neutral" }
 };
@@ -27,7 +25,7 @@ const nurVorbereiten = arg.includes("--nur-vorbereiten");
 
 const f = FASSUNGEN[welche];
 if (!f) {
-  console.error("Aufruf: node bauen.js <fdp|neutral> <mac|win|linux>");
+  console.error("Aufruf: node bauen.js neutral <mac|win|linux>");
   process.exit(1);
 }
 
@@ -67,7 +65,7 @@ const befehl = ["electron-builder", "--" + ziel,
   ...durchreichen.filter(a => a !== welche && a !== ziel)];
 console.log("  " + befehl.join(" "));
 // Auf Windows laeuft npx nur ueber die Shell, und die zerlegt Argumente an
-// Leerzeichen - "Daumenkino FDP" wuerde zu zwei Argumenten. Deshalb quoten.
+// Leerzeichen - "Daumenkino" wuerde zu zwei Argumenten. Deshalb quoten.
 const mitShell = process.platform === "win32";
 const aufruf = mitShell ? befehl.map(a => /\s/.test(a) ? '"' + a + '"' : a) : befehl;
 const r = spawnSync("npx", aufruf, { stdio: "inherit", cwd: hier, shell: mitShell });

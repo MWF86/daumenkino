@@ -10,14 +10,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "node bauen.js neutral --nur-vorbereiten && electron .",
-    "start:fdp": "node bauen.js fdp --nur-vorbereiten && electron .",
     "bau:mac": "node bauen.js neutral mac",
-    "bau:mac:fdp": "node bauen.js fdp mac",
     "bau:win": "node bauen.js neutral win",
-    "bau:win:fdp": "node bauen.js fdp win",
-    "bau:linux": "node bauen.js neutral linux",
-    "bau:mac:beide": "node bauen.js neutral mac && node bauen.js fdp mac",
-    "bau:win:beide": "node bauen.js neutral win && node bauen.js fdp win"
+    "bau:linux": "node bauen.js neutral linux"
   },
   "devDependencies": {
     "electron": "^43.0.0",

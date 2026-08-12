@@ -4,33 +4,29 @@ Werkzeug für Instagram-Karussells. Läuft im Browser oder als Programm für
 macOS und Windows. Ohne Konto, ohne Cloud, ohne Internetverbindung. Es wird
 nichts hochgeladen.
 
-## Zwei Fassungen, eine Quelle
+## Eine Fassung, eine Quelle
 
-| | neutral | intern |
-|---|---|---|
-| Programmname | Daumenkino | Daumenkino FDP |
-| Kennung | `de.moritzfingerle.daumenkino` | `de.moritzfingerle.daumenkino.fdp` |
-| Aktualisierungskanal | `latest` | `fdp` |
-| Farbvorgabe | neutral | Corporate Design der Freien Demokraten |
-| Impressum in der App | ja | nein |
+| | |
+|---|---|
+| Programmname | Daumenkino |
+| Kennung | `de.moritzfingerle.daumenkino` |
+| Aktualisierungskanal | `latest` |
 
-Beide lassen sich nebeneinander installieren. Getrennte Kanäle sorgen dafür,
-dass sie sich im selben Repository nicht die Aktualisierungsdatei
-überschreiben.
+Eigene Markenfarben stellt man in der Anwendung selbst ein oder bringt sie
+über eine Vorlagendatei mit.
 
 ## Loslegen
 
 ```bash
 npm install
-npm start           # neutrale Fassung
-npm run start:fdp   # interne Fassung
+npm start
 ```
 
 ## Bauen
 
 ```bash
-npm run bau:mac         npm run bau:mac:fdp
-npm run bau:win         npm run bau:win:fdp
+npm run bau:mac
+npm run bau:win
 ```
 
 Ergebnis in `fertig/`. Ein macOS-Programm lässt sich nur auf einem Mac
@@ -43,7 +39,7 @@ npm version patch
 git push --follow-tags
 ```
 
-GitHub baut daraufhin beide Fassungen für macOS und Windows und hängt sie an
+GitHub baut daraufhin die Programme für macOS und Windows und hängt sie an
 eine Veröffentlichung. Die bereits ausgelieferten Programme prüfen vier
 Sekunden nach dem Start, ob es etwas Neues gibt, laden es im Hintergrund und
 fragen einmal, ob neu gestartet werden soll.
@@ -67,7 +63,7 @@ Zertifikat, und Ruf entsteht erst über Downloadzahlen.
 main.js       Fenster, Menü, Speichern-Dialoge, Aktualisierung
 preload.js    die vier Funktionen, die das Fenster benutzen darf
 bauen.js      stellt app/ und icons/ aus quelle/ zusammen, startet den Bau
-quelle/       die beiden Anwendungen und die beiden Symbolsätze
+quelle/       die Anwendung und der Symbolsatz
 ```
 
 `app/`, `icons/` und `fassung.json` werden erzeugt und sind nicht versioniert.
