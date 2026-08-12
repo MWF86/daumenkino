@@ -77,11 +77,17 @@ body.folie .el.sel .gr{display:block}
 .sfolie{border:1px solid #22303f;border-radius:9px;padding:10px 11px 4px;margin-bottom:9px;background:#161f2b}
 .sfolie .feld{margin-bottom:7px}
 .sfoliekopf{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-.sfoliekopf b{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#8a94a6}
+.sfoliekopf b{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#8a94a6;white-space:nowrap}
 .sfoliekopf span{display:flex;gap:4px;flex:0 0 auto}
 button.sklein{width:26px;height:26px;padding:0;margin:0;flex:0 0 auto;font-size:12px;line-height:1;border-radius:7px}
 button.sklein:disabled{opacity:.32;cursor:default}
 select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
+.sfolie.aktiv{border-color:var(--a);box-shadow:0 0 0 1px var(--a) inset}
+.sfoliekopf b.zeigbar{cursor:pointer}
+.sfolie.aktiv .sfoliekopf b{color:var(--a)}
+.blaettern{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.blaettern span{flex:1;text-align:center;font-size:12px;color:#8a94a6}
+.blaettern button{flex:0 0 auto;width:30px;padding:0;margin:0}
 .sfolie .leer{color:#c78b3c}
 .pruef{border:1px solid #22303f;border-radius:8px;padding:12px 13px;margin-bottom:11px;background:#161f2b}
 .pruef h3{font-size:12.5px;margin-bottom:8px}
@@ -217,6 +223,11 @@ select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
     <button onclick="addImg()">＋ Bild</button>
 
     <h2>Serie</h2>
+    <div id="folgeblaettern" class="blaettern" style="display:none">
+      <button class="s" onclick="folieBlaettern(-1)" title="vorherige Folie">‹</button>
+      <span id="folgestand"></span>
+      <button class="s" onclick="folieBlaettern(1)" title="nächste Folie">›</button>
+    </div>
     <button class="p" onclick="folgeFolie()">＋ Nächste Folie</button>
     <p class="hin" style="margin-top:4px" id="folgehin"></p>
 
@@ -831,6 +842,9 @@ function formular(){
    Karussell mischen. Gespeichert wird nur der Name, nicht die Vorlage selbst,
    damit der Rueckgaengig-Puffer klein bleibt. */
 let SERIE_TPL=[];
+// Welche Folie der Serie gerade auf der Buehne steht. -1 = keine.
+// Solange eine gezeigt wird, wandern Textaenderungen an der Buehne in sie zurueck.
+let SERIE_AKTIV=-1;
 
 function serieRoh(){
   const t=g("serie").value;
@@ -882,8 +896,8 @@ function folieDazu(){
     serieSchreiben([tf.map(r=>(r.text||"").replace(/\s*\n\s*/g," "))]);
   }
   SERIE_TPL.push(null);
-  geaendert(); bauer(); folgeHinweis();
-  // Gleich ins erste Feld der neuen Folie springen
+  // Die neue Folie wird gleich die gezeigte - leer auf der Buehne, bereit zum Tippen.
+  folieZeigen(SERIE_TPL.length-1);
   const k=g("sbauer").querySelectorAll(".sfolie");
   const ta=k.length?k[k.length-1].querySelector("textarea"):null;
   if(ta) ta.focus();
@@ -898,19 +912,69 @@ function folgeFolie(){
   tab("serie"); folieDazu();
 }
 function folgeHinweis(txt){
-  const p=g("folgehin"); if(!p) return;
+  const p=g("folgehin"), bl=g("folgeblaettern"), st=g("folgestand");
+  if(!p) return;
+  const anzahl=serieAnzahl();
+  if(bl){
+    bl.style.display=anzahl?"":"none";
+    if(st) st.textContent=SERIE_AKTIV>=0?"Folie "+(SERIE_AKTIV+1)+" von "+anzahl
+                                        :anzahl+(anzahl===1?" Folie":" Folien")+" – keine gezeigt";
+  }
   if(txt!=null){ p.textContent=txt; return; }
-  const n=serienFolien().length, tf=textfelder().length;
+  const tf=textfelder().length;
   p.textContent=!tf ? "Gib den Textfeldern rechts erst einen Feldnamen."
-    : n ? "Die Serie hat "+(n===1?"1 Folie":n+" Folien")+". Der Knopf hängt eine weitere an."
-        : "Übernimmt diese Folie als erste der Serie und öffnet gleich die zweite – gleiches Aussehen, nur neue Texte.";
+    : SERIE_AKTIV>=0 ? "Du bearbeitest Folie "+(SERIE_AKTIV+1)+". Texte gehören zu dieser Folie, alles am Aussehen gilt für die ganze Serie."
+    : anzahl ? "Die Serie hat "+(anzahl===1?"1 Folie":anzahl+" Folien")+". Mit ‹ › eine davon auf die Bühne holen."
+             : "Übernimmt diese Folie als erste der Serie und öffnet gleich die zweite – gleiches Aussehen, nur neue Texte.";
+}
+/* Eine Folie der Serie auf die Buehne holen. Danach zeigt die Vorschau genau
+   das, was beim Export herauskommt, und im Reiter Folie laesst sie sich ganz
+   normal bearbeiten. Das Aussehen gehoert weiterhin der Vorlage - wer es
+   aendert, aendert es fuer alle Folien, die dieselbe Vorlage nutzen. */
+function folieZeigen(i){
+  serieAusrichten();
+  const bl=serieRoh();
+  if(i<0||i>=serieAnzahl()) return;
+  // Erst abmelden: die folgenden paint-Aufrufe wuerden sonst ueber geaendert()
+  // die neuen Texte in die zuletzt gezeigte Folie zurueckschreiben.
+  SERIE_AKTIV=-1;
+  const t=SERIE_TPL[i];
+  if(t&&t.galerie){
+    const v=galerieVorlage(t.galerie);
+    if(v&&v.daten){ const ruhig=__ruhig; __ruhig=true; try{ladeDaten(v.daten);}finally{__ruhig=ruhig;} }
+  }
+  const z=bl[i]||[], n=serienFolien().length||serieAnzahl();
+  textfelder().forEach((r,k)=>{ r.text=(z[k]??""); paint(r); });
+  autofelder().forEach(r=>{ r.text=String(i+1).padStart(2,"0")+" / "+String(n).padStart(2,"0"); paint(r); });
+  SERIE_AKTIV=i;
+  select(null); lagen(); bauer(); folgeHinweis();
+}
+// Textaenderungen an der Buehne zurueck in die gezeigte Folie schreiben.
+// Schreibt bewusst ohne geaendert(), sonst riefe es sich selbst wieder auf.
+function serieRueckschreiben(){
+  if(SERIE_AKTIV<0) return;
+  const n=serieAnzahl();
+  if(SERIE_AKTIV>=n){ SERIE_AKTIV=-1; return; }
+  const bl=serieRoh();
+  while(bl.length<n) bl.push([]);
+  const neu=textfelder().map(r=>(r.text||"").replace(/\s*\n\s*/g," "));
+  if(bl[SERIE_AKTIV].join("\n")===neu.join("\n")) return;
+  bl[SERIE_AKTIV]=neu;
+  g("serie").value=bl.map(b=>b.join("\n")).join("\n\n");
+}
+function folieBlaettern(d){
+  const n=serieAnzahl(); if(!n) return;
+  let i=SERIE_AKTIV<0?(d>0?0:n-1):SERIE_AKTIV+d;
+  if(i<0) i=n-1; if(i>=n) i=0;
+  folieZeigen(i);
 }
 function folieWeg(i){
   const bl=serieRoh(); serieAusrichten();
   const n=serieAnzahl();
   while(bl.length<n) bl.push([]);
   bl.splice(i,1); SERIE_TPL.splice(i,1);
-  serieSchreiben(bl); bauer();
+  if(SERIE_AKTIV===i) SERIE_AKTIV=-1; else if(SERIE_AKTIV>i) SERIE_AKTIV--;
+  serieSchreiben(bl); bauer(); folgeHinweis();
 }
 function folieSchieben(i,d){
   const j=i+d;
@@ -921,7 +985,8 @@ function folieSchieben(i,d){
   [bl[i],bl[j]]=[bl[j],bl[i]];
   const a=SERIE_TPL[i]||null, b=SERIE_TPL[j]||null;
   SERIE_TPL[i]=b; SERIE_TPL[j]=a;
-  serieSchreiben(bl); bauer();
+  if(SERIE_AKTIV===i) SERIE_AKTIV=j; else if(SERIE_AKTIV===j) SERIE_AKTIV=i;
+  serieSchreiben(bl); bauer(); folgeHinweis();
 }
 function bauer(){
   const box=g("sbauer"); if(!box) return;
@@ -935,11 +1000,17 @@ function bauer(){
     box.appendChild(p); leerHinweis(0); return;
   }
   bl.forEach((zeilen,i)=>{
-    const karte=document.createElement("div"); karte.className="sfolie";
+    const karte=document.createElement("div");
+    karte.className="sfolie"+(i===SERIE_AKTIV?" aktiv":"");
     const kopf=document.createElement("div"); kopf.className="sfoliekopf";
-    const t=document.createElement("b"); t.textContent="Folie "+(i+1); kopf.appendChild(t);
+    const t=document.createElement("b"); t.className="zeigbar";
+    t.textContent="Folie "+(i+1);
+    t.title="Diese Folie auf der Bühne zeigen und bearbeiten";
+    t.onclick=()=>folieZeigen(i);
+    kopf.appendChild(t);
     const kn=document.createElement("span");
-    [["↑","nach oben",()=>folieSchieben(i,-1),i===0],
+    [["◉","auf der Bühne zeigen",()=>folieZeigen(i),i===SERIE_AKTIV],
+     ["↑","nach oben",()=>folieSchieben(i,-1),i===0],
      ["↓","nach unten",()=>folieSchieben(i,1),i===bl.length-1],
      ["✕","entfernen",()=>folieWeg(i),false]].forEach(([z,titel,f,aus])=>{
       const b=document.createElement("button"); b.type="button"; b.className="s sklein";
@@ -981,6 +1052,8 @@ function bauer(){
           while(b2[i].length<namen.length) b2[i].push("");
           b2[i][k]=ta.value.replace(/\s*\n\s*/g," ");   // Zeilenumbrueche wuerden den Block sprengen
           serieSchreiben(b2);
+          // Wird diese Folie gerade gezeigt, laeuft die Vorschau beim Tippen mit.
+          if(i===SERIE_AKTIV){ const tf=textfelder(); if(tf[k]){ tf[k].text=b2[i][k]; paint(tf[k]); } }
           leerHinweis(serienFolien().length);
         };
         f.appendChild(l); f.appendChild(ta); karte.appendChild(f);});
@@ -1583,7 +1656,7 @@ function merke(){
   __zeiger=__puffer.length-1;}
 function widerrufen(){if(__zeiger>0){__zeiger--;anwenden(JSON.parse(__puffer[__zeiger]));sichern();}}
 function wiederholen(){if(__zeiger<__puffer.length-1){__zeiger++;anwenden(JSON.parse(__puffer[__zeiger]));sichern();}}
-function geaendert(){if(__ruhig||window.__start)return;clearTimeout(__g);__g=setTimeout(()=>{sichern();merke();},700);}
+function geaendert(){if(__ruhig||window.__start)return;serieRueckschreiben();clearTimeout(__g);__g=setTimeout(()=>{sichern();merke();},700);}
 
 /* zentrale Aenderungs-Haken */
 const __paint=paint;paint=function(r){__paint(r);geaendert();};
