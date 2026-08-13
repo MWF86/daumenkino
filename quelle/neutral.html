@@ -246,6 +246,17 @@ button.pweg{flex:0 0 auto;width:28px;padding:0;margin:0;border-radius:8px;font-s
     <button class="p" onclick="folgeFolie()">＋ Nächste Folie</button>
     <p class="hin" style="margin-top:4px" id="folgehin"></p>
 
+    <h2>Vorlage</h2>
+    <label>Name der Vorlage</label>
+    <input type="text" id="vorlname" placeholder="z. B. Kicker-Layout">
+    <button class="p" style="margin-top:7px" onclick="vorlageAblegen()">＋ Als neue Vorlage ablegen</button>
+    <button style="margin-top:6px" onclick="galerieZeigen()">Galerie öffnen</button>
+    <p class="hin" style="margin-top:4px" id="vorlhin">Legt das jetzige Aussehen zum Wiederverwenden ab.
+    Die Texte kommen mit, damit man sieht, wofür die Vorlage gedacht ist.</p>
+    <button style="margin-top:9px" onclick="leereFolie()">Leere Folie beginnen</button>
+    <p class="hin" style="margin-top:4px">Räumt die Bühne ab und fängt eine neue Gestaltung an.
+    Format, Markenfarben und Schrift bleiben, ebenso die Serie und der Bildtext.</p>
+
     <h2>Ebenen</h2>
     <div id="lagen"></div>
     <div style="margin-top:6px">
@@ -614,7 +625,7 @@ function tab(t){
   document.querySelectorAll("aside#links .seite").forEach(s=>s.style.display=s.classList.contains(t)?"":"none");
   [...g("reiter").children].forEach((b,i)=>b.classList.toggle("on", REITER[i]===t));
   REITER.forEach(x=>g("s_"+x).classList.toggle("on", x===t));
-  if(t==="folie"){ folgeHinweis(); }
+  if(t==="folie"){ folgeHinweis(); vorlnameFuellen(); }
   if(t==="serie"){ select(null); formular(); bauer(); }
   if(t==="pruefen"){ select(null); pruefen(); }
   if(t==="projekte"){ select(null); projekteZeigen(); }
@@ -1731,7 +1742,8 @@ const __bgPaint=bgPaint;bgPaint=function(){__bgPaint();geaendert();};
 const __palette=palette;palette=function(){__palette();geaendert();};
 ["serie","caption","vname"].forEach(id=>{const e=g(id);if(e)e.addEventListener("input",geaendert);});
 // Der Name der Arbeit steht an zwei Stellen; sie zeigen dasselbe Feld.
-(()=>{const v=g("vname");if(v)v.addEventListener("input",()=>{const p=g("pname");if(p)p.value=v.value;});})();
+(()=>{const v=g("vname");if(v)v.addEventListener("input",()=>{
+  const p=g("pname");if(p)p.value=v.value; vorlnameFuellen();});})();
 // Wer den Textkasten von Hand bearbeitet, soll das oben sofort sehen.
 (()=>{const e=g("serie");if(e)e.addEventListener("change",()=>bauer());})();
 document.addEventListener("keydown",e=>{
@@ -2021,18 +2033,67 @@ function eigeneSichern(l){
       localStorage.setItem(VORLAGEN,JSON.stringify(l));
       const st=g("seriestatus");if(st)st.textContent="Hinweis: Wenig Speicher – die Galerie wurde ohne eingebettete Bilder gesichert.";
     }catch(e2){alert("Die Vorlage konnte nicht in der Galerie gesichert werden: Der lokale Speicher ist voll. Lösche in der Galerie alte Vorlagen.");}}}
-async function vorlageInGalerie(){
+async function vorlageInGalerie(wunschName){
   const cv=await bild();
   const k=document.createElement("canvas");
   const f=220/cv.width;k.width=220;k.height=Math.round(cv.height*f);
   const x=k.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,k.width,k.height);
   x.drawImage(cv,0,0,k.width,k.height);
   const l=eigeneVorlagen();
-  const name=g("vname").value||"Vorlage";
+  const name=(wunschName||g("vname").value||"Vorlage").trim()||"Vorlage";
   const neu={name:name,bild:k.toDataURL("image/jpeg",0.72),daten:daten()};
   const alt=l.findIndex(v=>v.name===name);          // gleicher Name ersetzt
   if(alt>=0)l[alt]=neu;else l.unshift(neu);
   eigeneSichern(l.slice(0,24));
+  return name;
+}
+
+/* ---------- Vorlage und leere Folie, direkt im Reiter Folie ----------
+   Beides sass bisher im Reiter Serie, also weit weg von der Stelle, an der
+   man gestaltet. */
+function vorlHinweis(txt){const p=g("vorlhin"); if(p) p.textContent=txt;}
+// Freier Name: der Name der Arbeit, und wenn es den schon gibt, mit Zahl.
+function vorlageVorschlag(){
+  const da=eigeneVorlagen().map(v=>v.name);
+  const b=((g("vname").value||"Vorlage").trim())||"Vorlage";
+  if(!da.includes(b)) return b;
+  let n=2; while(da.includes(b+" "+n)) n++;
+  return b+" "+n;
+}
+// Nur der Platzhalter, nicht der Wert: So laeuft der Vorschlag mit, wenn die
+// Arbeit umbenannt wird, ueberschreibt aber nie einen selbst getippten Namen.
+function vorlnameFuellen(){
+  const f=g("vorlname"); if(f) f.placeholder=vorlageVorschlag();
+}
+async function vorlageAblegen(){
+  const f=g("vorlname");
+  const name=((f&&f.value)||"").trim()||vorlageVorschlag();
+  if(eigeneVorlagen().some(v=>v.name===name)
+     && !confirm("Es gibt schon eine Vorlage „"+name+"“. Soll sie ersetzt werden?")) return;
+  vorlHinweis("wird abgelegt …");
+  try{
+    await vorlageInGalerie(name);
+    if(f) f.value="";                    // wieder frei fuer die naechste
+    vorlnameFuellen();
+    vorlHinweis("„"+name+"“ liegt jetzt in der Galerie. Über „Galerie öffnen“ holst du sie zurück.");
+  }catch(e){ vorlHinweis("Das hat nicht geklappt: "+(e.message||e)); }
+}
+function leereFolie(){
+  const n=serienFolien().length;
+  if(n && !confirm("Die Serie hat "+n+(n===1?" Folie":" Folien")+", die auf dieser Gestaltung aufbauen. "
+     +"Eine leere Folie nimmt ihnen die Textfelder. Trotzdem neu anfangen?")) return;
+  // Erst abmelden: sonst schriebe das Leeren ueber geaendert() in die gerade
+  // gezeigte Folie der Serie zurueck und loeschte deren Text.
+  SERIE_AKTIV=-1;
+  __ruhig=true;
+  try{
+    neu();
+    g("bgart").value="farbe"; g("bg1").value="#2fd0bd"; bgImg=null; bgPaint();
+    addText();
+  } finally { __ruhig=false; }
+  select(null); lagen(); bauer(); folgeHinweis();
+  sichern(); merke(); projektNachfuehren();
+  vorlHinweis("Leere Folie. Format, Markenfarben und Schrift sind geblieben.");
 }
 function vorlageWeg(i){const l=eigeneVorlagen();l.splice(i,1);eigeneSichern(l);galerieZeigen();}
 function galerieZeigen(){
@@ -2164,6 +2225,7 @@ setFormat();bgPaint();schriftDateiHolen();schriftListe();schriftSetzen(SCHRIFT);
 // Zu welcher Arbeit gehoert der wiederhergestellte Stand?
 try{ PROJEKT_ID=localStorage.getItem(PIDSCHLUESSEL)||null; }catch(e){}
 {const p=g("pname"); if(p) p.value=g("vname").value;}
+vorlnameFuellen();
 window.__start=false;
 if(window.innerWidth<=1100) autoZoom();
 let __t; window.addEventListener("resize", ()=>{ clearTimeout(__t);

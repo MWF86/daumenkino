@@ -1,7 +1,7 @@
 {
   "name": "daumenkino",
   "productName": "Daumenkino",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Karussells für Instagram bauen. Ohne Konto, ohne Cloud.",
   "main": "main.js",
   "author": {
