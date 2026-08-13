@@ -771,9 +771,15 @@ function paint(r){
   s.left=r.x+"px";s.top=r.y+"px";s.width=r.w+"px";
   s.opacity=(r.op??100)/100;s.transform=`rotate(${r.rot||0}deg)`;
   if(r.t==="text"){
-    s.height="auto"; r.el.textContent=r.text;
+    s.height="auto";
+    // Versalien werden am Text selbst gemacht, nicht ueber CSS text-transform.
+    // Grund: html2canvas misst den grossgeschriebenen Text, greift dann aber mit
+    // denselben Stellen auf den Originalknoten zu. Aus "Straße" wird "STRASSE" -
+    // ein Zeichen mehr, und der Export bricht komplett ab ("The offset 22 is
+    // larger than the node's length (20)"). Am 13.08.2026 nachgestellt.
+    r.el.textContent = r.upper==="uppercase" ? (r.text||"").toUpperCase() : r.text;
     Object.assign(s,{fontSize:r.size+"px",fontWeight:r.weight,color:r.color,textAlign:r.align,
-      lineHeight:r.lh/100,letterSpacing:(r.ls/100)+"em",textTransform:r.upper,textDecoration:r.strike,
+      lineHeight:r.lh/100,letterSpacing:(r.ls/100)+"em",textTransform:"none",textDecoration:r.strike,
       background:r.bgAn?r.bg:"none",borderRadius:(r.bgAn?(r.rad||0):0)+"px",
       padding:r.bgAn?((r.pad||0)*0.62)+"px "+(r.pad||0)+"px":"0",
       display:r.bgAn&&r.rad>=999?"inline-block":"block",
