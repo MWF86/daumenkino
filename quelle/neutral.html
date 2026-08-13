@@ -1053,6 +1053,13 @@ function folieWeg(i){
   const bl=serieRoh(); serieAusrichten();
   const n=serieAnzahl();
   while(bl.length<n) bl.push([]);
+  // Nur fragen, wenn wirklich etwas verloren geht. Bei einer leeren Folie
+  // waere die Rueckfrage nur laestig.
+  const inhalt=(bl[i]||[]).map(z=>(z||"").trim()).filter(Boolean);
+  if(inhalt.length){
+    const probe=inhalt[0].length>40?inhalt[0].slice(0,40)+"…":inhalt[0];
+    if(!confirm("Folie "+(i+1)+" löschen?\n\n„"+probe+"“\n\nDas lässt sich nicht rückgängig machen.")) return;
+  }
   bl.splice(i,1); SERIE_TPL.splice(i,1);
   if(SERIE_AKTIV===i) SERIE_AKTIV=-1; else if(SERIE_AKTIV>i) SERIE_AKTIV--;
   serieSchreiben(bl); bauer(); folgeHinweis();
