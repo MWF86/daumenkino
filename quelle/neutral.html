@@ -85,6 +85,18 @@ select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
 .sfolie.aktiv{border-color:var(--a);box-shadow:0 0 0 1px var(--a) inset}
 .sfoliekopf b.zeigbar{cursor:pointer}
 .sfolie.aktiv .sfoliekopf b{color:var(--a)}
+/* Projektliste: Vorschaubild links, Name und Zeit rechts daneben */
+.pzeile{display:flex;gap:6px;align-items:stretch;margin-bottom:7px}
+button.poeffnen{flex:1;display:flex;gap:9px;align-items:center;text-align:left;padding:6px;margin:0;
+  border-radius:9px;border:1px solid #22303f;background:#161f2b;cursor:pointer;font:inherit;color:#e7ecf3;overflow:hidden}
+button.poeffnen:hover{border-color:var(--a)}
+button.poeffnen img{flex:0 0 auto;width:44px;height:55px;object-fit:cover;border-radius:5px;background:#0d141d}
+.ptext{min-width:0;display:block}
+.ptext b{display:block;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ptext i{display:block;font-style:normal;font-size:10.5px;color:#6d7c93;margin-top:2px}
+.pzeile.aktiv button.poeffnen{border-color:var(--a);box-shadow:0 0 0 1px var(--a) inset}
+.pzeile.aktiv .ptext b{color:var(--a)}
+button.pweg{flex:0 0 auto;width:28px;padding:0;margin:0;border-radius:8px;font-size:11px}
 .blaettern{display:flex;align-items:center;gap:6px;margin-bottom:7px}
 .blaettern span{flex:1;text-align:center;font-size:12px;color:#8a94a6}
 .blaettern button{flex:0 0 auto;width:30px;padding:0;margin:0}
@@ -123,7 +135,9 @@ select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
   body.zeigRechts #links{display:none}
   #top{flex-wrap:wrap;gap:8px;padding:max(9px,env(safe-area-inset-top)) 12px 9px}
   #top .marke{flex:1 1 auto}
-  #reiter{width:100%;order:3}#reiter button{flex:1;padding:9px 6px}
+  #reiter{width:100%;order:3}#reiter button{flex:1;padding:9px 6px;min-width:0}
+  /* Ohne das schiebt margin-left:auto die Knopfleiste ueber den rechten Rand hinaus */
+  #top .rechts{width:100%;order:2;margin-left:0;flex-wrap:wrap}
   #umschalt{display:inline-block !important}
   button{padding:12px 12px;font-size:13.5px}
   input,select,textarea{padding:11px 10px;font-size:16px}
@@ -147,6 +161,7 @@ select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
     <button class="on" onclick="tab('folie')">Folie</button>
     <button onclick="tab('serie')">Serie</button>
     <button onclick="tab('pruefen')">Prüfen</button>
+    <button onclick="tab('projekte')">Projekte</button>
   </div>
   <div class="rechts">
     <button class="s" id="umschalt" style="display:none" onclick="seite()">Einstellen</button><button class="s" onclick="hilfe(1)">Hilfe</button><button class="s" onclick="impressum(1)">Impressum</button>
@@ -288,6 +303,19 @@ select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
     <p class="hin">Beliebig viele Farben. Klick auf eine Farbe zum Ändern, das ✕ entfernt sie.
     Die Palette erscheint überall dort, wo du eine Farbe wählst, und wird mit der Vorlage gespeichert.</p>
   </section>
+
+  <section class="seite projekte" style="display:none">
+    <h2>Diese Arbeit</h2>
+    <label>Name</label><input type="text" id="pname" oninput="projektUmbenennen(this.value)">
+    <p class="hin" style="margin-top:4px" id="pstand"></p>
+    <button class="p" style="margin-top:9px" onclick="neuesProjekt()">＋ Neues Projekt</button>
+    <p class="hin" style="margin-top:4px">Legt die jetzige Arbeit unten ab und fängt mit einer leeren Folie neu an.
+    Deine Markenfarben und die Schrift bleiben.</p>
+
+    <h2>Meine Projekte</h2>
+    <div id="pliste"></div>
+    <p class="hin" id="plistehin"></p>
+  </section>
 </aside>
 
 <div id="mitte"><div id="hull"><div id="stage"><div id="raster"><div class="q"></div></div></div></div></div>
@@ -387,6 +415,28 @@ select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
     </div>
   </section>
 
+  <section id="s_projekte">
+    <div class="pruef">
+      <h3>Projekt oder Vorlage?</h3>
+      <p class="hin" style="margin-top:0">Ein <b>Projekt</b> ist eine ganze Arbeit: die Folie, alle
+      Folien der Serie und der Bildtext. Genau das, woran du gerade sitzt.</p>
+      <p class="hin">Eine <b>Vorlage</b> ist nur das Aussehen einer Folie zum Wiederverwenden. Die
+      liegt in der Galerie im Reiter Serie.</p>
+    </div>
+    <div class="pruef">
+      <h3>Wo das liegt</h3>
+      <p class="hin" style="margin-top:0">Alles bleibt auf diesem Gerät, in diesem Browser. Nichts wird
+      hochgeladen. Wer die Browserdaten für diese Seite löscht, löscht auch die Projekte.</p>
+      <p class="hin">Zum Mitnehmen oder Weitergeben: im Reiter Serie <b>Vorlage speichern</b> – das
+      ergibt eine Datei, die du sichern und woanders wieder laden kannst.</p>
+    </div>
+    <div class="pruef">
+      <h3>Platz</h3>
+      <div class="zahl" id="pplatz">–</div>
+      <div class="hin" id="pplatzhin">belegt von deinen Projekten</div>
+    </div>
+  </section>
+
 </div></aside>
 </main>
 <div id="impbox" style="position:fixed;inset:0;background:#060a10ee;z-index:400;display:none;align-items:center;justify-content:center;padding:26px">
@@ -466,6 +516,12 @@ select.svorlage{margin-bottom:9px;font-size:12px;padding:6px 8px}
       <li>Unter Format stehen auch <b>Flyer und Plakate von A6 bis A0</b>, auf Wunsch quer.</li>
       <li><b>Druck-PDF</b> erzeugt eine druckfertige Datei mit 3 mm Beschnitt für die Online-Druckerei. Wichtige Texte 10 mm vom Rand fernhalten.</li>
       <li>Mit Serientexten wird daraus ein PDF mit mehreren Seiten, etwa für Vorder- und Rückseite eines Flyers.</li>
+    </ul>
+    <h4>Projekte</h4>
+    <ul>
+      <li>Deine Arbeit wird von selbst gesichert. Im Reiter <b>Projekte</b> stehen alle deine Arbeiten mit Vorschaubild – ein Klick öffnet eine davon.</li>
+      <li><b>＋ Neues Projekt</b> legt die jetzige Arbeit ab und fängt mit einer leeren Folie neu an.</li>
+      <li>Alles bleibt auf deinem Gerät. Zum Mitnehmen oder Weitergeben nimmst du <b>Vorlage speichern</b> im Reiter Serie.</li>
     </ul>
     <p class="kl">Eigene Schriften lädst du im Reiter Folie unter Schrift. Die Schriftdatei bleibt auf deinem Gerät
     und wird mit der Vorlage nicht weitergegeben – nur der Name der Schrift.</p>
@@ -552,14 +608,16 @@ function hilfe(an){ g("hilfe").style.display=an?"flex":"none"; }
 function seite(){ const an=document.body.classList.toggle("zeigRechts");
   g("umschalt").textContent = an ? "Werkzeuge" : "Einstellen"; }
 function impressum(an){ g("impbox").style.display=an?"flex":"none"; }
+const REITER=["folie","serie","pruefen","projekte"];
 function tab(t){
   reiter=t; document.body.className=t;
   document.querySelectorAll("aside#links .seite").forEach(s=>s.style.display=s.classList.contains(t)?"":"none");
-  [...g("reiter").children].forEach((b,i)=>b.classList.toggle("on", ["folie","serie","pruefen"][i]===t));
-  ["folie","serie","pruefen"].forEach(x=>g("s_"+x).classList.toggle("on", x===t));
+  [...g("reiter").children].forEach((b,i)=>b.classList.toggle("on", REITER[i]===t));
+  REITER.forEach(x=>g("s_"+x).classList.toggle("on", x===t));
   if(t==="folie"){ folgeHinweis(); }
   if(t==="serie"){ select(null); formular(); bauer(); }
   if(t==="pruefen"){ select(null); pruefen(); }
+  if(t==="projekte"){ select(null); projekteZeigen(); }
 }
 
 function setFormat(){ [W,H]=g("format").value.split("x").map(Number);
@@ -1656,7 +1714,15 @@ function merke(){
   __zeiger=__puffer.length-1;}
 function widerrufen(){if(__zeiger>0){__zeiger--;anwenden(JSON.parse(__puffer[__zeiger]));sichern();}}
 function wiederholen(){if(__zeiger<__puffer.length-1){__zeiger++;anwenden(JSON.parse(__puffer[__zeiger]));sichern();}}
-function geaendert(){if(__ruhig||window.__start)return;serieRueckschreiben();clearTimeout(__g);__g=setTimeout(()=>{sichern();merke();},700);}
+// Die Arbeit wandert zusaetzlich in die Projektablage. Seltener als die
+// Absturzsicherung und ohne Vorschaubild - das kostet einen html2canvas-Lauf
+// und wuerde beim Tippen bremsen. Das Bild frischt der Reiter Projekte auf.
+let __pa;
+function projektNachfuehren(){
+  clearTimeout(__pa);
+  __pa=setTimeout(()=>{projektAblegen(false);},4000);
+}
+function geaendert(){if(__ruhig||window.__start)return;serieRueckschreiben();clearTimeout(__g);__g=setTimeout(()=>{sichern();merke();projektNachfuehren();},700);}
 
 /* zentrale Aenderungs-Haken */
 const __paint=paint;paint=function(r){__paint(r);geaendert();};
@@ -1664,6 +1730,8 @@ const __lagen=lagen;lagen=function(){__lagen();geaendert();};
 const __bgPaint=bgPaint;bgPaint=function(){__bgPaint();geaendert();};
 const __palette=palette;palette=function(){__palette();geaendert();};
 ["serie","caption","vname"].forEach(id=>{const e=g(id);if(e)e.addEventListener("input",geaendert);});
+// Der Name der Arbeit steht an zwei Stellen; sie zeigen dasselbe Feld.
+(()=>{const v=g("vname");if(v)v.addEventListener("input",()=>{const p=g("pname");if(p)p.value=v.value;});})();
 // Wer den Textkasten von Hand bearbeitet, soll das oben sofort sehen.
 (()=>{const e=g("serie");if(e)e.addEventListener("change",()=>bauer());})();
 document.addEventListener("keydown",e=>{
@@ -1767,6 +1835,183 @@ function vorlagenGalerie(){
 /* Eigene Galerie: Beim Speichern einer Vorlage wird zusaetzlich ein kleines
    Vorschaubild angelegt und alles lokal im Geraet abgelegt. Die Galerie zeigt
    zuerst die eigenen Vorlagen, darunter die mitgelieferten Startpunkte. */
+/* ---------- Projekte ----------
+   Ein Projekt ist eine ganze Arbeit: Folie, Serie, Bildtext, Name. Die
+   Vorlagen-Galerie hebt dagegen nur das Aussehen einer Folie auf.
+   Gespeichert wird in IndexedDB und nicht im localStorage: Ein einziges
+   Hintergrundfoto als Daten-URL ist schnell ein halbes Megabyte, und der
+   localStorage ist nach etwa fuenf Megabyte voll. IndexedDB hat Platz fuer
+   ein Vielfaches davon.
+   Der localStorage bleibt trotzdem die Absturzsicherung fuer die laufende
+   Arbeit - das ist bewusst doppelt: schnell und ohne Warten beim Tippen. */
+const PDB="daumenkino-projekte", PLAGER="projekte", PIDSCHLUESSEL="daumenkino.projektId";
+let PROJEKT_ID=null, __pliste=[];
+
+function pOeffnen(){
+  return new Promise((ja,nein)=>{
+    let a; try{ a=indexedDB.open(PDB,1); }catch(e){ nein(e); return; }
+    a.onupgradeneeded=()=>{ const d=a.result;
+      if(!d.objectStoreNames.contains(PLAGER)) d.createObjectStore(PLAGER,{keyPath:"id"}); };
+    a.onsuccess=()=>ja(a.result);
+    a.onerror=()=>nein(a.error);
+    a.onblocked=()=>nein(new Error("Datenbank blockiert"));
+  });
+}
+function pLauf(art,fn){
+  return pOeffnen().then(d=>new Promise((ja,nein)=>{
+    const t=d.transaction(PLAGER,art), l=t.objectStore(PLAGER);
+    let wert; const a=fn(l);
+    if(a) a.onsuccess=()=>{wert=a.result;};
+    t.oncomplete=()=>{d.close();ja(wert);};
+    t.onerror=()=>{d.close();nein(t.error);};
+    t.onabort=()=>{d.close();nein(t.error||new Error("abgebrochen"));};
+  }));
+}
+const pAlle    =()=>pLauf("readonly", l=>l.getAll()).then(a=>(a||[]).sort((x,y)=>(y.zeit||0)-(x.zeit||0)));
+const pHolen   =id=>pLauf("readonly", l=>l.get(id));
+const pAblegen =rec=>pLauf("readwrite",l=>l.put(rec));
+const pWeg     =id=>pLauf("readwrite",l=>l.delete(id));
+
+function pNeueId(){
+  try{ if(crypto&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+  return "p"+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36);
+}
+function pName(){ return (g("vname").value||"").trim()||"Ohne Namen"; }
+function pZeitText(z){
+  if(!z) return "";
+  const d=new Date(z), n=new Date();
+  const g2=x=>String(x).padStart(2,"0");
+  const heute=d.toDateString()===n.toDateString();
+  return heute ? "heute "+g2(d.getHours())+":"+g2(d.getMinutes())
+               : g2(d.getDate())+"."+g2(d.getMonth()+1)+"."+d.getFullYear();
+}
+// Vorschaubild fuer die Liste. Kostet einen html2canvas-Lauf, deshalb nur
+// an den wenigen Stellen, wo das Bild wirklich veraltet waere.
+async function pVorschau(){
+  try{
+    const cv=await bild();
+    const k=document.createElement("canvas");
+    const f=180/cv.width; k.width=180; k.height=Math.round(cv.height*f);
+    const x=k.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,k.width,k.height);
+    x.drawImage(cv,0,0,k.width,k.height);
+    return k.toDataURL("image/jpeg",0.7);
+  }catch(e){ return null; }
+}
+// Die laufende Arbeit ablegen. mitBild nur dort, wo es sich lohnt.
+async function projektAblegen(mitBild){
+  try{
+    if(!PROJEKT_ID){ PROJEKT_ID=pNeueId(); try{localStorage.setItem(PIDSCHLUESSEL,PROJEKT_ID);}catch(e){} }
+    const alt=await pHolen(PROJEKT_ID).catch(()=>null);
+    const rec={id:PROJEKT_ID, name:pName(), zeit:Date.now(),
+               bild: mitBild ? (await pVorschau()) || (alt&&alt.bild) || null : (alt&&alt.bild)||null,
+               stand: stand()};
+    await pAblegen(rec);
+    return rec;
+  }catch(e){ return null; }
+}
+function projektUmbenennen(name){
+  g("vname").value=name;
+  geaendert();
+  clearTimeout(projektUmbenennen.__t);
+  projektUmbenennen.__t=setTimeout(()=>{projektAblegen(false).then(()=>projekteListe());},500);
+}
+async function neuesProjekt(){
+  await projektAblegen(true);            // die bisherige Arbeit sichern
+  __ruhig=true;
+  try{
+    PROJEKT_ID=null; try{localStorage.removeItem(PIDSCHLUESSEL);}catch(e){}
+    neu();                                // Elemente weg
+    g("vname").value="Neues Projekt";
+    g("format").value="1080x1350"; if(g("quer")) g("quer").checked=false; setFormat();
+    g("bgart").value="farbe"; g("bg1").value="#2fd0bd"; bgImg=null; bgPaint();
+    g("serie").value=""; g("caption").value="";
+    SERIE_TPL=[]; SERIE_AKTIV=-1;
+    addText();
+  } finally { __ruhig=false; }
+  select(null); lagen(); bauer(); folgeHinweis(); capPruef();
+  sichern(); merke();
+  await projektAblegen(false);
+  await projekteZeigen();
+}
+async function projektOeffnen(id){
+  if(id===PROJEKT_ID) return;
+  await projektAblegen(true);            // erst die jetzige Arbeit sichern
+  const rec=await pHolen(id).catch(()=>null);
+  if(!rec||!rec.stand){ await projekteListe(); return; }
+  anwenden(rec.stand);
+  PROJEKT_ID=id; try{localStorage.setItem(PIDSCHLUESSEL,id);}catch(e){}
+  g("vname").value=rec.name||"Ohne Namen";
+  sichern(); merke(); await projekteZeigen();
+}
+async function projektLoeschen(id,name){
+  if(!confirm("„"+name+"“ wirklich löschen? Das lässt sich nicht rückgängig machen.")) return;
+  await pWeg(id).catch(()=>{});
+  if(id===PROJEKT_ID){ PROJEKT_ID=null; try{localStorage.removeItem(PIDSCHLUESSEL);}catch(e){} }
+  await projekteZeigen();
+}
+// Erst die Liste zeigen, dann das Vorschaubild nachziehen. Ein html2canvas-Lauf
+// dauert rund eine Sekunde - so lange soll niemand auf eine leere Liste starren.
+async function projekteZeigen(){
+  g("pname").value=g("vname").value;
+  const st=g("pstand"); if(st) st.textContent="wird gesichert …";
+  await projekteListe();
+  const rec=await projektAblegen(true);
+  const n=serienFolien().length;
+  if(st) st.textContent=rec
+    ? "Gesichert "+pZeitText(rec.zeit)+(n?" · "+n+(n===1?" Folie":" Folien")+" in der Serie":"")
+    : "Diese Arbeit lässt sich hier nicht ablegen – vermutlich privates Fenster.";
+  if(reiter==="projekte") await projekteListe();
+}
+async function projekteListe(){
+  const box=g("pliste"); if(!box) return;
+  let liste=[];
+  try{ liste=await pAlle(); }
+  catch(e){ box.innerHTML="";
+    const p=document.createElement("p"); p.className="hin";
+    p.textContent="Die Projektablage lässt sich in diesem Browser nicht öffnen. Im privaten Modus ist sie oft abgeschaltet. Deine Arbeit bleibt trotzdem gesichert, nur die Liste fehlt.";
+    box.appendChild(p); return; }
+  __pliste=liste;
+  box.innerHTML="";
+  if(!liste.length){
+    const p=document.createElement("p"); p.className="hin"; p.style.marginTop="0";
+    p.textContent="Noch keine Projekte. Sobald du arbeitest, erscheint deine Arbeit hier von selbst.";
+    box.appendChild(p);
+  }
+  liste.forEach(v=>{
+    const z=document.createElement("div");
+    z.className="pzeile"+(v.id===PROJEKT_ID?" aktiv":"");
+    const b=document.createElement("button"); b.type="button"; b.className="poeffnen";
+    b.title=v.id===PROJEKT_ID?"Das ist die Arbeit, die gerade offen ist":"Dieses Projekt öffnen";
+    const n=(v.stand&&v.stand.serieTpl&&v.stand.serieTpl.length)||0;
+    b.innerHTML='<img src="'+(v.bild||"")+'" alt="">'
+      +'<span class="ptext"><b></b><i></i></span>';
+    b.querySelector("b").textContent=v.name||"Ohne Namen";
+    b.querySelector("i").textContent=pZeitText(v.zeit)+(n?" · "+n+(n===1?" Folie":" Folien"):"")
+      +(v.id===PROJEKT_ID?" · offen":"");
+    b.onclick=()=>projektOeffnen(v.id);
+    const x=document.createElement("button"); x.type="button"; x.className="s pweg";
+    x.textContent="✕"; x.title="Projekt löschen";
+    x.onclick=e=>{e.stopPropagation();projektLoeschen(v.id,v.name||"Ohne Namen");};
+    z.appendChild(b); z.appendChild(x); box.appendChild(z);
+  });
+  const h=g("plistehin");
+  if(h) h.textContent=liste.length?liste.length+(liste.length===1?" Projekt":" Projekte")+" auf diesem Gerät.":"";
+  pPlatzZeigen(liste);
+}
+function pPlatzZeigen(liste){
+  const z=g("pplatz"), h=g("pplatzhin"); if(!z) return;
+  let b=0; try{ b=liste.reduce((s,v)=>s+JSON.stringify(v).length,0); }catch(e){}
+  const mb=b/1048576;
+  z.textContent = mb<1 ? Math.round(b/1024)+" KB" : mb.toFixed(1)+" MB";
+  if(navigator.storage&&navigator.storage.estimate){
+    navigator.storage.estimate().then(s=>{
+      if(!s||!s.quota) return;
+      h.textContent="belegt von "+liste.length+(liste.length===1?" Projekt":" Projekten")
+        +" – dieser Browser gibt dir rund "+Math.round(s.quota/1048576)+" MB.";
+    }).catch(()=>{});
+  }
+}
+
 const VORLAGEN="daumenkino.vorlagen";
 function eigeneVorlagen(){try{return JSON.parse(localStorage.getItem(VORLAGEN))||[];}catch(e){return [];}}
 function eigeneSichern(l){
@@ -1916,6 +2161,9 @@ function galerieZeigen(){
 
 window.__start=true;
 setFormat();bgPaint();schriftDateiHolen();schriftListe();schriftSetzen(SCHRIFT);if(!wiederherstellen())addText();select(null);lagen();bauer();folgeHinweis();setTimeout(merke,80);
+// Zu welcher Arbeit gehoert der wiederhergestellte Stand?
+try{ PROJEKT_ID=localStorage.getItem(PIDSCHLUESSEL)||null; }catch(e){}
+{const p=g("pname"); if(p) p.value=g("vname").value;}
 window.__start=false;
 if(window.innerWidth<=1100) autoZoom();
 let __t; window.addEventListener("resize", ()=>{ clearTimeout(__t);
