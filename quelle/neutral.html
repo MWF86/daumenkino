@@ -278,6 +278,7 @@ button.pweg{flex:0 0 auto;width:28px;padding:0;margin:0;border-radius:8px;font-s
     <h2>Folien der Serie</h2>
     <div id="sbauer"></div>
     <button style="margin-top:7px" onclick="folieDazu()">＋ Folie hinzufügen</button>
+    <button class="s" style="margin-top:6px" id="serieleeren" onclick="serieLeeren()">Ganze Serie leeren</button>
     <p class="hin" style="margin-top:6px" id="sbauerhin"></p>
 
     <details id="sroh" style="margin-top:12px">
@@ -1037,6 +1038,17 @@ function folieBlaettern(d){
   if(i<0) i=n-1; if(i>=n) i=0;
   folieZeigen(i);
 }
+// Die ganze Serie wegwerfen. Die Gestaltung der Folie bleibt stehen - geloescht
+// werden nur die Folientexte und die Zuordnung der Vorlagen.
+function serieLeeren(){
+  const n=serieAnzahl(); if(!n) return;
+  if(!confirm("Alle "+n+(n===1?" Folie":" Folien")+" der Serie löschen?"
+     +"\n\nDie Gestaltung bleibt, nur die Folientexte gehen weg. Das lässt sich nicht rückgängig machen.")) return;
+  SERIE_AKTIV=-1; SERIE_TPL=[];
+  g("serie").value="";
+  geaendert(); bauer(); folgeHinweis();
+  const st=g("seriestatus"); if(st) st.textContent="Serie geleert. Die Folie steht unverändert da.";
+}
 function folieWeg(i){
   const bl=serieRoh(); serieAusrichten();
   const n=serieAnzahl();
@@ -1137,6 +1149,7 @@ function bauer(){
 }
 function leerHinweis(n){
   const h=g("sbauerhin"); if(h) h.textContent=n?(n===1?"1 Folie":n+" Folien")+" werden ausgegeben.":"";
+  const l=g("serieleeren"); if(l) l.style.display=serieAnzahl()?"":"none";
   folgeHinweis();
 }
 
@@ -2095,7 +2108,18 @@ function leereFolie(){
   sichern(); merke(); projektNachfuehren();
   vorlHinweis("Leere Folie. Format, Markenfarben und Schrift sind geblieben.");
 }
-function vorlageWeg(i){const l=eigeneVorlagen();l.splice(i,1);eigeneSichern(l);galerieZeigen();}
+function vorlageWeg(i){
+  const l=eigeneVorlagen(); const v=l[i]; if(!v) return;
+  // Vorher nachfragen: ein Fehlklick auf das kleine Kreuz war sonst endgueltig.
+  const benutzt=SERIE_TPL.filter(t=>t&&t.galerie===v.name).length;
+  if(!confirm("Vorlage „"+v.name+"“ löschen?"
+      +(benutzt?"\n\nAchtung: "+(benutzt===1
+          ? "Eine Folie deiner Serie holt ihr Aussehen von dieser Vorlage und fällt danach auf das Aussehen der aktuellen Folie zurück."
+          : benutzt+" Folien deiner Serie holen ihr Aussehen von dieser Vorlage und fallen danach auf das Aussehen der aktuellen Folie zurück."):"")
+      +"\n\nDas lässt sich nicht rückgängig machen.")) return;
+  l.splice(i,1); eigeneSichern(l); galerieZeigen();
+  if(reiter==="serie") bauer();
+}
 function galerieZeigen(){
   const alt=g("galerie");if(alt)alt.remove();
   const d=document.createElement("div");d.id="galerie";
